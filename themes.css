@@ -1,0 +1,292 @@
+/* Final theme system for 5 light + 5 dark variations
+   Botanical B3
+   Celestial C1
+   Ocean O1
+   Meadow M3
+   Berry R3
+*/
+
+/* =========================
+   BOTANICAL LIGHT — leafy green + lilac
+   ========================= */
+body.theme-botanical-light {
+  
+  --bg: #edf4e9;
+  --sidebar-bg: #dcebd8;
+  --panel: #f7faf2;
+  --panel-strong: #d5e5c8;
+  --card: rgba(247, 250, 242, 0.96);
+  --text: #26372d;
+  --muted: #587362;
+  --border: rgba(57, 91, 67, 0.18);
+  --purple: #8051a0;
+  --purple-strong: #ddc4ed;
+  --dark: #355d47;
+  --white: #ffffff;
+  --shadow: 0 12px 28px rgba(41, 61, 48, 0.08);
+  --illustration-a: rgba(112, 177, 127, 0.34);
+  --illustration-b: rgba(164, 112, 194, 0.34);
+  --illustration-c: rgba(255, 255, 255, 0.30);
+--accent-a: #b483cc;
+--accent-b: #a7cc95;
+}
+
+
+body.theme-botanical-dark {
+  --bg: #18231f;
+  --sidebar-bg: #1f2d28;
+  --panel: #253a32;
+  --panel-strong: #355548;
+  --card: rgba(37, 58, 50, 0.92);
+  --text: #edf5ef;
+  --muted: #b5c8be;
+  --border: rgba(216, 233, 221, 0.14);
+  --purple: #b2d1b0;
+  --purple-strong: #4b6f5c;
+  --dark: #b2d1b0;
+  --white: #18231f;
+  --shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+  --illustration-a: rgba(178, 209, 176, 0.16);
+  --illustration-b: rgba(142, 120, 152, 0.18);
+  --illustration-c: rgba(255, 255, 255, 0.08);
+  --accent-a: rgba(83, 125, 112, 0.48);
+  --accent-b: rgba(155, 131, 166, 0.48);
+}
+
+/* =========================
+   CELESTIAL
+   ========================= */
+body.theme-celestial-light {
+  --bg: #f5f0fa;
+  --sidebar-bg: #eee5f7;
+  --panel: #fcf9ff;
+  --panel-strong: #e3d5f3;
+  --card: rgba(252, 249, 255, 0.9);
+  --text: #2e2540;
+  --muted: #786b87;
+  --border: rgba(73, 58, 95, 0.13);
+  --purple: #a388d5;
+  --purple-strong: #e3d8f8;
+  --dark: #523f70;
+  --white: #ffffff;
+  --shadow: 0 12px 28px rgba(61, 46, 84, 0.08);
+  --illustration-a: rgba(185, 167, 220, 0.20);
+  --illustration-b: rgba(240, 185, 167, 0.18);
+  --illustration-c: rgba(255, 255, 255, 0.45);
+--accent-a: #ffb8b8;
+--accent-b: #da99ff;
+}
+body.theme-celestial-dark {
+  --bg: #1e1b2b;
+  --sidebar-bg: #262235;
+  --panel: #312b40;
+  --panel-strong: #493d63;
+  --card: rgba(49, 43, 64, 0.92);
+  --text: #f5efff;
+  --muted: #c2b3d9;
+  --border: rgba(232, 221, 255, 0.14);
+  --purple: #c6b0f3;
+  --purple-strong: #5f4b7e;
+  --dark: #c6b0f3;
+  --white: #1e1b2b;
+  --shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
+  --illustration-a: rgba(198, 176, 243, 0.16);
+  --illustration-b: rgba(214, 153, 139, 0.16);
+  --illustration-c: rgba(255, 255, 255, 0.08);
+  --accent-a: rgba(128, 101, 178, 0.48);
+  --accent-b: rgba(199, 131, 115, 0.48);
+}
+
+/* =========================
+   OCEAN
+   ========================= */
+/* OCEAN LIGHT */
+body.theme-ocean-light {
+  --bg: #edf7f6;
+  --sidebar-bg: #e1efee;
+  --panel: #f8fcfb;
+  --panel-strong: #d1ebea;
+  --card: rgba(248, 252, 251, 0.9);
+  --text: #203837;
+  --muted: #5d7a7a;
+  --border: rgba(35, 81, 76, 0.14);
+  --purple: #4d9a93;
+  --purple-strong: #b8ded9;
+  --dark: #2d6860;
+  --white: #ffffff;
+  --shadow: 0 12px 28px rgba(36, 68, 64, 0.08);
+  --illustration-a: rgba(143, 200, 193, 0.20);
+  --illustration-b: rgba(232, 154, 141, 0.18);
+  --illustration-c: rgba(255, 255, 255, 0.45);
+--accent-a: #a2deeb;
+--accent-b: #f59f90;
+
+}
+
+body.theme-ocean-dark {
+  --bg: #101a2b;
+  --sidebar-bg: #16243a;
+  --panel: #1d2d46;
+  --panel-strong: #263b59;
+  --card: rgba(29, 45, 70, 0.94);
+  --text: #eef4ff;
+  --muted: #aabbd3;
+  --border: rgba(196, 216, 245, 0.16);
+  --purple: #83c9e8;
+  --purple-strong: #315a7d;
+  --dark: #83c9e8;
+  --white: #101a2b;
+  --shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
+  --illustration-a: rgba(93, 164, 220, 0.22);
+  --illustration-b: rgba(104, 199, 190, 0.18);
+  --illustration-c: rgba(221, 235, 255, 0.08);
+  --accent-a: rgba(73, 132, 190, 0.56);
+  --accent-b: rgba(55, 151, 158, 0.5);
+}
+
+/* =========================
+   MEADOW
+   ========================= */
+body.theme-meadow-light {
+  --bg: #f7f6ed;
+  --sidebar-bg: #efeedf;
+  --panel: #fcfbf4;
+  --panel-strong: #e7e3bb;
+  --card: rgba(252, 251, 244, 0.92);
+  --text: #31371e;
+  --muted: #6f7467;
+  --border: rgba(77, 84, 52, 0.14);
+  --purple: #7a9cca;
+  --purple-strong: #dce8f8;
+  --dark: #4e6c8b;
+  --white: #ffffff;
+  --shadow: 0 12px 28px rgba(63, 70, 51, 0.08);
+  --illustration-a: rgba(159, 201, 214, 0.20);
+  --illustration-b: rgba(232, 161, 143, 0.18);
+  --illustration-c: rgba(255, 255, 255, 0.45);
+--accent-a: #ddedad;
+--accent-b: #edac7b;
+
+}
+
+body.theme-meadow-dark {
+  --bg: #211813;
+  --sidebar-bg: #2c2019;
+  --panel: #38271e;
+  --panel-strong: #563722;
+  --card: rgba(56, 39, 30, 0.94);
+  --text: #f7eee3;
+  --muted: #c9ad94;
+  --border: rgba(245, 211, 179, 0.16);
+  --purple: #d98b58;
+  --purple-strong: #70452d;
+  --dark: #d98b58;
+  --white: #211813;
+  --shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
+  --illustration-a: rgba(208, 126, 67, 0.2);
+  --illustration-b: rgba(163, 91, 56, 0.2);
+  --illustration-c: rgba(255, 237, 215, 0.08);
+  --accent-a: rgba(173, 91, 48, 0.56);
+  --accent-b: rgba(211, 132, 76, 0.48);
+}
+/* =========================
+   BERRY
+   ========================= */
+body.theme-berry-light {
+  --bg: #f8eef2;
+  --sidebar-bg: #f0e3ea;
+  --panel: #fdf9fb;
+  --panel-strong: #edd4df;
+  --card: rgba(253, 249, 251, 0.9);
+  --text: #392b34;
+  --muted: #7e6b73;
+  --border: rgba(88, 54, 69, 0.14);
+  --purple: #c77e8f;
+  --purple-strong: #f0ced8;
+  --dark: #6d4257;
+  --white: #ffffff;
+  --shadow: 0 12px 28px rgba(79, 47, 60, 0.08);
+  --illustration-a: rgba(201, 131, 145, 0.20);
+  --illustration-b: rgba(159, 201, 200, 0.18);
+  --illustration-c: rgba(255, 255, 255, 0.45);
+--accent-a: #fcaef1;
+--accent-b: #abe0df;
+}
+
+body.theme-berry-dark {
+  --bg: #251a22;
+  --sidebar-bg: #2f212b;
+  --panel: #412d38;
+  --panel-strong: #5b3a49;
+  --card: rgba(65, 45, 56, 0.92);
+  --text: #fff1f6;
+  --muted: #d1b1bc;
+  --border: rgba(255, 224, 236, 0.14);
+  --purple: #d99cae;
+  --purple-strong: #714a5e;
+  --dark: #d99cae;
+  --white: #251a22;
+  --shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+  --illustration-a: rgba(217, 156, 174, 0.16);
+  --illustration-b: rgba(130, 177, 176, 0.16);
+  --illustration-c: rgba(255, 255, 255, 0.08);
+  --accent-a: rgba(169, 86, 109, 0.48);
+  --accent-b: rgba(95, 153, 152, 0.48);
+}
+/* Light theme color blending */
+body.theme-botanical-light {
+  --illustration-a: rgba(180, 131, 204, 0.42);
+  --illustration-b: rgba(167, 204, 149, 0.42);
+}
+
+body.theme-celestial-light {
+  --illustration-a: rgba(255, 184, 184, 0.42);
+  --illustration-b: rgba(218, 153, 255, 0.42);
+}
+
+body.theme-ocean-light {
+  --illustration-a: rgba(162, 222, 235, 0.42);
+  --illustration-b: rgba(245, 159, 144, 0.42);
+}
+
+body.theme-meadow-light {
+  --illustration-a: rgba(221, 237, 173, 0.42);
+  --illustration-b: rgba(237, 172, 123, 0.42);
+}
+
+body.theme-berry-light {
+  --illustration-a: rgba(252, 174, 241, 0.42);
+  --illustration-b: rgba(171, 224, 223, 0.42);
+}
+
+/* Apply the two colors to the background glow */
+body.theme-botanical-light::before,
+body.theme-celestial-light::before,
+body.theme-ocean-light::before,
+body.theme-meadow-light::before,
+body.theme-berry-light::before {
+  background:
+    radial-gradient(ellipse at 18% 18%, var(--illustration-a), transparent 42%),
+    radial-gradient(ellipse at 82% 24%, var(--illustration-b), transparent 42%),
+    radial-gradient(ellipse at 70% 78%, var(--illustration-a), transparent 45%);
+  opacity: 1;
+  filter: blur(18px);
+}
+
+/* Apply the two colors to light-theme cards */
+body.theme-botanical-light .panel,
+body.theme-botanical-light .summary-card,
+body.theme-celestial-light .panel,
+body.theme-celestial-light .summary-card,
+body.theme-ocean-light .panel,
+body.theme-ocean-light .summary-card,
+body.theme-meadow-light .panel,
+body.theme-meadow-light .summary-card,
+body.theme-berry-light .panel,
+body.theme-berry-light .summary-card {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--panel) 78%, var(--illustration-a)),
+    color-mix(in srgb, var(--panel) 78%, var(--illustration-b))
+  ) !important;
+}
