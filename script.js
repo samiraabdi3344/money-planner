@@ -236,11 +236,6 @@ document.addEventListener("click", (event) => {
     deleteTransaction(deleteButton.dataset.id);
   }
 });
-document.querySelectorAll("[data-close='transaction-modal']").forEach(button => {
-  button.addEventListener("click", () => {
-    transactionModal.classList.add("hidden");
-  });
-});
 const transactionForm = document.getElementById("transaction-form");
 
 if (transactionForm) {
@@ -326,6 +321,15 @@ document.querySelector(".save-plan-btn")?.addEventListener("click", () => {
   savePlan();
   renderDashboard();
   closeModal("plan-modal");
+});
+document.querySelectorAll("[data-close]").forEach(button => {
+  button.addEventListener("click", () => {
+    closeModal(button.dataset.close);
+  });
+});
+
+document.getElementById("theme-toggle-btn")?.addEventListener("click", () => {
+  openModal("theme-modal");
 });
 const themeNames = [
   "theme-botanical-light",
