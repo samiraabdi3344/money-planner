@@ -1,0 +1,225 @@
+/* Layout refinements for the Canva-inspired dashboard structure.
+   Colors and theme behavior remain controlled by style.css and themes.css. */
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.sidebar {
+  flex: 0 0 220px;
+  min-height: 100vh;
+}
+
+.main {
+  min-width: 0;
+  max-width: 1500px;
+}
+
+.topbar {
+  align-items: center;
+}
+
+.topbar-actions {
+  align-items: flex-end;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.summary-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 20px;
+}
+
+.plan-grid {
+  grid-template-columns: minmax(220px, 0.72fr) minmax(0, 1.28fr);
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.plan-grid > .panel {
+  min-width: 0;
+  min-height: 270px;
+}
+
+.available-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.available-panel h2 {
+  max-width: 15ch;
+  margin-bottom: 18px;
+}
+
+.available-panel > strong {
+  margin: 0 0 8px;
+  font-size: clamp(2.4rem, 4vw, 3.5rem);
+  font-weight: 800;
+  letter-spacing: -0.06em;
+}
+
+.available-panel > p,
+.set-aside-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.set-aside-heading,
+.upcoming-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.set-aside-heading h2,
+.upcoming-heading h3 {
+  margin: 0;
+}
+
+.set-aside-heading > strong,
+.upcoming-heading > strong {
+  flex: 0 0 auto;
+  margin: 0;
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.set-aside-heading .eyebrow {
+  margin-bottom: 5px;
+}
+
+.set-aside-note {
+  margin-top: 5px;
+}
+
+.upcoming-heading {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.upcoming-heading p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.set-aside-panel .bill-list {
+  margin-top: 7px;
+}
+
+.set-aside-panel .bill-list li {
+  padding: 9px 0;
+}
+
+.set-aside-panel .bill-list li > strong {
+  display: inline;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: normal;
+}
+
+.set-aside-panel .secondary-btn {
+  margin-top: 12px;
+}
+
+.bottom-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 18px;
+}
+
+.bottom-grid > .panel {
+  min-width: 0;
+  min-height: 250px;
+}
+
+.recent-list li {
+  flex-wrap: wrap;
+}
+
+.transaction-info {
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .app-shell {
+    display: block;
+  }
+
+  .sidebar {
+    width: 100%;
+    min-height: auto;
+    padding: 14px 18px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .brand {
+    margin-bottom: 10px;
+  }
+
+  .nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .nav-item {
+    padding: 8px 10px;
+  }
+
+  .main {
+    padding: 22px;
+  }
+}
+
+@media (max-width: 640px) {
+  .main {
+    padding: 18px 14px 28px;
+  }
+
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .topbar-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .summary-card {
+    padding: 15px;
+  }
+
+  .summary-card p {
+    margin-bottom: 8px;
+  }
+
+  .plan-grid,
+  .bottom-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .plan-grid > .panel,
+  .bottom-grid > .panel {
+    min-height: auto;
+  }
+
+  .available-panel {
+    min-height: 210px !important;
+  }
+}

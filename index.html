@@ -4,56 +4,53 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Money Dashboard</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="themes.css">
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="themes.css" />
+    <link rel="stylesheet" href="layout.css" />
   </head>
   <body>
     <div class="app-shell">
       <aside class="sidebar">
         <div class="brand">Money dashboard</div>
-
-        <nav class="nav">
+        <nav class="nav" aria-label="Main navigation">
           <a class="nav-item active" href="#">Overview</a>
           <a class="nav-item" href="#">Transactions</a>
-          <a class="nav-item" href="#">Budgets</a>
+          <a class="nav-item" href="#">Budget</a>
           <a class="nav-item" href="#">Insights</a>
-          <a class="nav-item" href="#">Settings</a>
+          <a class="nav-item" href="#">Earnings</a>
+          <a class="nav-item" href="#">Saver</a>
         </nav>
       </aside>
 
       <main class="main">
         <header class="topbar">
           <div class="greeting">
-            <p class="eyebrow">YOUR MONEY, MADE CLEAR</p>
+            <p class="eyebrow">Your money, made clear</p>
             <h1>Hi, Samira</h1>
           </div>
-
           <div class="topbar-actions">
-  <label class="period-picker">
-    <span>Planning period</span>
-    <select>
-      <option>This month</option>
-    </select>
-  </label>
-
-  <button id="theme-toggle-btn" class="secondary-btn" type="button">Theme</button>
-  <button id="add-transaction-btn" class="primary-btn" type="button">+ Add transaction</button>
-</div>
+            <label class="period-picker">
+              <span>Planning period</span>
+              <select aria-label="Planning period">
+                <option>This month</option>
+              </select>
+            </label>
+            <button id="theme-toggle-btn" class="secondary-btn" type="button">Theme</button>
+            <button id="add-transaction-btn" class="primary-btn" type="button">+ Add transaction</button>
+          </div>
         </header>
 
-        <section class="summary-grid">
+        <section class="summary-grid" aria-label="Monthly summary">
           <article class="summary-card">
             <p>Budget</p>
             <strong id="budget-total">$1,200</strong>
             <span>Your plan for this month</span>
           </article>
-
           <article class="summary-card">
             <p>Spent</p>
             <strong id="spent-total">$340</strong>
             <span>Recorded this month</span>
           </article>
-
           <article class="summary-card">
             <p>Remaining</p>
             <strong id="remaining-total">$860</strong>
@@ -61,76 +58,60 @@
           </article>
         </section>
 
-        <section class="plan-section">
-          <div class="section-header">
-            <p class="eyebrow">PLAN AHEAD</p>
-            <h2>Your money plan</h2>
-          </div>
+        <section class="plan-grid" aria-label="Money plan">
+          <article class="panel panel-highlight available-panel">
+            <h2>Available for planning + spending</h2>
+            <strong id="available-to-plan">$0</strong>
+            <p>After your set-aside amount and upcoming bills.</p>
+          </article>
 
-          <div class="plan-grid">
-            <article class="panel panel-highlight">
-              <h3>Available to plan</h3>
-             <strong id="available-to-plan">$0</strong>
-              <p>Your remaining monthly budget.</p>
-            </article>
-
-            <article class="panel">
-              <h3>Set money aside</h3>
-              <p>Bills coming up: <strong id="bills-allocated">$0</strong></p>
-              <p class="flexible">Flexible spending: <strong id="flexible-spending">$0</strong></p>
-              <button id="plan-amount-btn" class="secondary-btn" type="button">Plan an amount</button>
-            </article>
-
-            <article class="panel">
-              <div class="panel-head">
-                <div>
-                  <h3>Coming up</h3>
-                  <p>Due in the next 14 days</p>
-                </div>
-                <a href="#">View all</a>
+          <article class="panel set-aside-panel">
+            <div class="set-aside-heading">
+              <div>
+                <p class="eyebrow">Your plan</p>
+                <h2>Set aside total</h2>
               </div>
+              <strong id="planned-amount-total">$0</strong>
+            </div>
+            <p class="set-aside-note">Your planned amount for savings or other goals.</p>
 
-              <ul class="bill-list">
-                <li>
-                  <span>Rent <time>20 Dec</time></span>
-                  <strong>$400</strong>
-                </li>
-                <li>
-                  <span>Phone <time>24 Dec</time></span>
-                  <strong>$45</strong>
-                </li>
-                <li>
-                  <span>Internet <time>25 Dec</time></span>
-                  <strong>$60</strong>
-                </li>
-              </ul>
-            </article>
-          </div>
+            <div class="upcoming-heading">
+              <div>
+                <h3>Coming up</h3>
+                <p>Due in the next 14 days</p>
+              </div>
+              <strong id="bills-allocated">$0</strong>
+            </div>
+            <ul class="bill-list">
+              <li><span>Rent <time>20 Dec</time></span><strong>$400</strong></li>
+              <li><span>Phone <time>24 Dec</time></span><strong>$45</strong></li>
+              <li><span>Internet <time>25 Dec</time></span><strong>$60</strong></li>
+            </ul>
+            <button id="plan-amount-btn" class="secondary-btn" type="button">Plan an amount</button>
+          </article>
         </section>
 
         <div class="bottom-grid">
-          <section class="panel">
+          <section class="panel spending-panel">
             <div class="panel-head">
               <div>
-                <p class="eyebrow">YOUR SPENDING</p>
-                <h2>Spending by date</h2>
+                <p class="eyebrow">Your spending</p>
+                <h2>Total spending by date</h2>
               </div>
               <a href="#">View all</a>
             </div>
+            <div id="spending-by-date" aria-live="polite"></div>
+          </section>
 
-             <div id="spending-by-date" aria-live="polite"></div>
-            </section>
-
-          <section class="panel">
+          <section class="panel activity-panel">
             <div class="panel-head">
               <div>
-                <p class="eyebrow">LATEST ACTIVITY</p>
+                <p class="eyebrow">Latest activity</p>
                 <h2>Recent transactions</h2>
               </div>
               <a href="#">View all</a>
             </div>
-
-            <ul class="recent-list" id="recent-transactions-list">
+            <ul class="recent-list" id="recent-transactions-list" aria-live="polite">
               <li><span>Groceries</span><strong>$42</strong></li>
               <li><span>Bus pass</span><strong>$20</strong></li>
               <li><span>Coffee</span><strong>$8</strong></li>
@@ -142,139 +123,94 @@
     </div>
 
     <div class="modal hidden" id="plan-modal">
-  <div class="modal-card">
-    <div class="modal-header">
-      <h3>Plan an amount</h3>
-      <button type="button" class="close-btn" data-close="plan-modal">×</button>
-    </div>
-
-    <label class="modal-label">
-      <span>How much do you want to set aside?</span>
-      <input id="planned-amount" type="number" min="0" step="5" value="0" />
-    </label>
-
-    <label class="modal-label">
-      <span>Note</span>
-      <input type="text" placeholder="Bills, savings, travel..." />
-    </label>
-
-    <div class="modal-actions">
-      <button class="secondary-btn" type="button" data-close="plan-modal">Cancel</button>
-      <button type="button" class="primary-btn save-plan-btn">Save</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal hidden" id="transaction-modal">
-  <div class="modal-card">
-    <div class="modal-header">
-      <h3>Add transaction</h3>
-      <button type="button" class="close-btn" data-close="transaction-modal">×</button>
-    </div>
-
-    <form id="transaction-form" novalidate>
-      <div id="transaction-form-error" class="form-error" aria-live="polite"></div>
-      <input type="hidden" name="id" id="transaction-id" />
-
-      <label class="modal-label">
-        <span>Type</span>
-        <select name="type" required>
-          <option value="expense">Expense</option>
-          <option value="income">Income</option>
-        </select>
-      </label>
-
-      <label class="modal-label">
-        <span>Amount</span>
-        <input name="amount" type="number" min="0.01" step="0.01" placeholder="42.00" required>
-      </label>
-
-      <label class="modal-label">
-        <span>Description</span>
-        <input name="description" type="text" placeholder="Groceries" required>
-      </label>
-
-      <label class="modal-label">
-        <span>Category</span>
-        <input name="category" type="text" placeholder="Food" required>
-      </label>
-
-      <label class="modal-label">
-        <span>Date</span>
-        <input name="date" type="date" required>
-      </label>
-
-      <label class="modal-label">
-        <span>Notes (optional)</span>
-        <input name="notes" type="text" placeholder="Add a note">
-      </label>
-
-      <div class="modal-actions">
-        <button class="secondary-btn" type="button" data-close="transaction-modal">Cancel</button>
-        <button class="primary-btn" type="submit">Add</button>
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Plan an amount</h3>
+          <button type="button" class="close-btn" data-close="plan-modal" aria-label="Close">×</button>
+        </div>
+        <label class="modal-label">
+          <span>How much do you want to set aside?</span>
+          <input id="planned-amount" type="number" min="0" step="5" value="0" />
+        </label>
+        <label class="modal-label">
+          <span>Note</span>
+          <input type="text" placeholder="Bills, savings, travel..." />
+        </label>
+        <div class="modal-actions">
+          <button class="secondary-btn" type="button" data-close="plan-modal">Cancel</button>
+          <button type="button" class="primary-btn save-plan-btn">Save</button>
+        </div>
       </div>
-    </form>
-  </div>
-</div>
-<div class="modal hidden" id="theme-modal">
-  <div class="modal-card">
-    <div class="modal-header">
-      <h3>Choose a theme</h3>
-      <button type="button" class="close-btn" data-close="theme-modal">×</button>
     </div>
 
-    <div class="theme-grid">
-  <button class="theme-option" data-theme="theme-botanical-light" type="button">
-    <span class="theme-swatch botanical-light"></span>
-    Botanical · Light
-  </button>
-  <button class="theme-option" data-theme="theme-botanical-dark" type="button">
-    <span class="theme-swatch botanical-dark"></span>
-    Botanical · Dark
-  </button>
-
-  <button class="theme-option" data-theme="theme-celestial-light" type="button">
-    <span class="theme-swatch celestial-light"></span>
-    Celestial · Light
-  </button>
-  <button class="theme-option" data-theme="theme-celestial-dark" type="button">
-    <span class="theme-swatch celestial-dark"></span>
-    Celestial · Dark
-  </button>
-
-  <button class="theme-option" data-theme="theme-ocean-light" type="button">
-    <span class="theme-swatch ocean-light"></span>
-    Ocean · Light
-  </button>
-  <button class="theme-option" data-theme="theme-ocean-dark" type="button">
-    <span class="theme-swatch ocean-dark"></span>
-    Ocean · Dark
-  </button>
-
-  <button class="theme-option" data-theme="theme-meadow-light" type="button">
-    <span class="theme-swatch meadow-light"></span>
-    Meadow · Light
-  </button>
-  <button class="theme-option" data-theme="theme-meadow-dark" type="button">
-    <span class="theme-swatch meadow-dark"></span>
-    Meadow · Dark
-  </button>
-
-  <button class="theme-option" data-theme="theme-berry-light" type="button">
-    <span class="theme-swatch berry-light"></span>
-    Berry · Light
-  </button>
-  <button class="theme-option" data-theme="theme-berry-dark" type="button">
-    <span class="theme-swatch berry-dark"></span>
-    Berry · Dark
-  </button>
-</div>
-
-    <div class="modal-actions">
-      <button class="secondary-btn" data-close="theme-modal">Close</button>
+    <div class="modal hidden" id="transaction-modal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Add transaction</h3>
+          <button type="button" class="close-btn" data-close="transaction-modal" aria-label="Close">×</button>
+        </div>
+        <form id="transaction-form" novalidate>
+          <div id="transaction-form-error" class="form-error" aria-live="polite"></div>
+          <input type="hidden" name="id" id="transaction-id" />
+          <label class="modal-label">
+            <span>Type</span>
+            <select name="type" required>
+              <option value="expense">Expense</option>
+              <option value="income">Income</option>
+            </select>
+          </label>
+          <label class="modal-label">
+            <span>Amount</span>
+            <input name="amount" type="number" min="0.01" step="0.01" placeholder="42.00" required />
+          </label>
+          <label class="modal-label">
+            <span>Description</span>
+            <input name="description" type="text" placeholder="Groceries" required />
+          </label>
+          <label class="modal-label">
+            <span>Category</span>
+            <input name="category" type="text" placeholder="Food" required />
+          </label>
+          <label class="modal-label">
+            <span>Date</span>
+            <input name="date" type="date" required />
+          </label>
+          <label class="modal-label">
+            <span>Notes (optional)</span>
+            <input name="notes" type="text" placeholder="Add a note" />
+          </label>
+          <div class="modal-actions">
+            <button class="secondary-btn" type="button" data-close="transaction-modal">Cancel</button>
+            <button class="primary-btn" type="submit">Add</button>
+          </div>
+        </form>
+      </div>
     </div>
-  </div>
-</div>
-<script src="script.js"></script>
+
+    <div class="modal hidden" id="theme-modal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Choose a theme</h3>
+          <button type="button" class="close-btn" data-close="theme-modal" aria-label="Close">×</button>
+        </div>
+        <div class="theme-grid">
+          <button class="theme-option" data-theme="theme-botanical-light" type="button"><span class="theme-swatch botanical-light"></span>Botanical · Light</button>
+          <button class="theme-option" data-theme="theme-botanical-dark" type="button"><span class="theme-swatch botanical-dark"></span>Botanical · Dark</button>
+          <button class="theme-option" data-theme="theme-celestial-light" type="button"><span class="theme-swatch celestial-light"></span>Celestial · Light</button>
+          <button class="theme-option" data-theme="theme-celestial-dark" type="button"><span class="theme-swatch celestial-dark"></span>Celestial · Dark</button>
+          <button class="theme-option" data-theme="theme-ocean-light" type="button"><span class="theme-swatch ocean-light"></span>Ocean · Light</button>
+          <button class="theme-option" data-theme="theme-ocean-dark" type="button"><span class="theme-swatch ocean-dark"></span>Ocean · Dark</button>
+          <button class="theme-option" data-theme="theme-meadow-light" type="button"><span class="theme-swatch meadow-light"></span>Meadow · Light</button>
+          <button class="theme-option" data-theme="theme-meadow-dark" type="button"><span class="theme-swatch meadow-dark"></span>Meadow · Dark</button>
+          <button class="theme-option" data-theme="theme-berry-light" type="button"><span class="theme-swatch berry-light"></span>Berry · Light</button>
+          <button class="theme-option" data-theme="theme-berry-dark" type="button"><span class="theme-swatch berry-dark"></span>Berry · Dark</button>
+        </div>
+        <div class="modal-actions">
+          <button class="secondary-btn" type="button" data-close="theme-modal">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
   </body>
 </html>

@@ -34,7 +34,7 @@ function formatMoney(value) {
     style: "currency",
     currency: "USD"
   }).format(value);
-  }
+}
 function getTotals() {
   const spent = transactions
     .filter(item => item.type === "expense")
@@ -59,6 +59,7 @@ function getTotals() {
     spent,
     remaining,
     income,
+    plannedReserve,
     billsAllocated,
     availableToPlan,
     flexibleSpending
@@ -71,9 +72,9 @@ function renderSummaryCards() {
     "budget-total": totals.budget,
     "spent-total": totals.spent,
     "remaining-total": totals.remaining,
-    "available-to-plan": totals.availableToPlan,
-    "bills-allocated": totals.billsAllocated,
-    "flexible-spending": totals.flexibleSpending
+    "available-to-plan": totals.flexibleSpending,
+    "planned-amount-total": totals.plannedReserve,
+    "bills-allocated": totals.billsAllocated
   };
 
   Object.entries(values).forEach(([id, value]) => {
