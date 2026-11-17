@@ -172,7 +172,8 @@
       <button type="button" class="close-btn" data-close="transaction-modal">×</button>
     </div>
 
-    <form id="transaction-form">
+    <form id="transaction-form" novalidate>
+      <div id="transaction-form-error" class="form-error" aria-live="polite"></div>
       <input type="hidden" name="id" id="transaction-id" />
 
       <label class="modal-label">
