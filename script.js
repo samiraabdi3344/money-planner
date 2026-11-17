@@ -1,4 +1,6 @@
 const STORAGE_KEY = "money-dashboard-transactions";
+const PLAN_STORAGE_KEY = "money-dashboard-plan";
+
 let transactions = [];
 
 try {
@@ -6,6 +8,17 @@ try {
   transactions = Array.isArray(saved) ? saved : [];
 } catch (error) {
   console.error("Could not load saved transactions:", error);
+}
+
+let plannedBudget = { amount: 0, note: "" };
+
+try {
+  const savedPlan = JSON.parse(localStorage.getItem(PLAN_STORAGE_KEY));
+  if (savedPlan && typeof savedPlan.amount === "number") {
+    plannedBudget = savedPlan;
+  }
+} catch (error) {
+  console.error("Could not load saved plan:", error);
 }
 
 const BUDGET = 1200;
@@ -32,13 +45,14 @@ function getTotals() {
     .reduce((sum, item) => sum + Number(item.amount), 0);
 
   const remaining = BUDGET - spent;
+  const plannedReserve = Number(plannedBudget.amount || 0);
 
   const billsAllocated = plannedBills
     .filter(bill => !bill.paid)
     .reduce((sum, bill) => sum + Number(bill.amount), 0);
 
-  const availableToPlan = remaining;
-  const flexibleSpending = availableToPlan - billsAllocated;
+  const availableToPlan = Math.max(remaining - plannedReserve, 0);
+  const flexibleSpending = Math.max(availableToPlan - billsAllocated, 0);
 
   return {
     budget: BUDGET,
@@ -109,6 +123,9 @@ function renderRecentTransactions() {
 }
 function saveTransactions() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+}
+function savePlan() {
+  localStorage.setItem(PLAN_STORAGE_KEY, JSON.stringify(plannedBudget));
 }
 function openEditTransactionModal(id) {
   const transaction = transactions.find(item => item.id === id);
@@ -286,22 +303,30 @@ function closeModal(id) {
 }
 
 document.getElementById("plan-amount-btn")?.addEventListener("click", () => {
+  const amountInput = document.getElementById("planned-amount");
+  const noteInput = document.querySelector("#plan-modal input[type='text']");
+
+  if (amountInput) amountInput.value = plannedBudget.amount || 0;
+  if (noteInput) noteInput.value = plannedBudget.note || "";
+
   openModal("plan-modal");
 });
 
-document.querySelectorAll("[data-close]").forEach(button => {
-  button.addEventListener("click", () => {
-    closeModal(button.dataset.close);
-  });
+document.querySelector(".save-plan-btn")?.addEventListener("click", () => {
+  const amountInput = document.getElementById("planned-amount");
+  const noteInput = document.querySelector("#plan-modal input[type='text']");
+
+  const amount = Number(amountInput?.value || 0);
+  const note = noteInput?.value || "";
+
+  if (!Number.isFinite(amount) || amount < 0) return;
+
+  plannedBudget = { amount, note };
+
+  savePlan();
+  renderDashboard();
+  closeModal("plan-modal");
 });
-
-const themeToggleButton = document.getElementById("theme-toggle-btn");
-if (themeToggleButton) {
-  themeToggleButton.addEventListener("click", () => {
-    openModal("theme-modal");
-  });
-}
-
 const themeNames = [
   "theme-botanical-light",
   "theme-botanical-dark",
