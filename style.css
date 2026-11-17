@@ -275,7 +275,30 @@ h3 {
   padding: 12px 0;
   border-top: 1px solid var(--border);
 }
+.transaction-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 12px;
+}
 
+.transaction-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mini-btn {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
 .bill-list li:first-child,
 .recent-list li:first-child,
 .mini-list li:first-child {
@@ -351,7 +374,13 @@ summary::-webkit-details-marker {
   color: var(--muted);
   font-size: 0.92rem;
 }
-
+.empty-state {
+  padding: 16px 12px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
 .modal.hidden {
   display: none;
 }
@@ -419,7 +448,13 @@ summary::-webkit-details-marker {
   gap: 10px;
   margin-top: 12px;
 }
-
+.form-error {
+  min-height: 18px;
+  margin: 0 0 12px;
+  color: #b42318;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
 #theme-toggle-btn {
   border: 1px solid var(--border);
   background: transparent;

@@ -70,14 +70,14 @@
           <div class="plan-grid">
             <article class="panel panel-highlight">
               <h3>Available to plan</h3>
-              <strong>$860</strong>
+             <strong id="available-to-plan">$0</strong>
               <p>Your remaining monthly budget.</p>
             </article>
 
             <article class="panel">
               <h3>Set money aside</h3>
-              <p>Bills coming up: <strong>$505</strong></p>
-              <p class="flexible">Flexible spending: <strong>$355</strong></p>
+              <p>Bills coming up: <strong id="bills-allocated">$0</strong></p>
+              <p class="flexible">Flexible spending: <strong id="flexible-spending">$0</strong></p>
               <button id="plan-amount-btn" class="secondary-btn" type="button">Plan an amount</button>
             </article>
 
@@ -118,7 +118,8 @@
               <a href="#">View all</a>
             </div>
 
-            <div id="spending-by-date"></div>
+             <div id="spending-by-date" aria-live="polite"></div>
+            </section>
 
           <section class="panel">
             <div class="panel-head">
@@ -152,15 +153,17 @@
       <input id="planned-amount" type="number" min="0" step="5" value="0" />
     </label>
 
-    <label class="modal-label">
-      <span>Note</span>
-      <input type="text" placeholder="Bills, savings, travel..." />
-    </label>
+       <label class="modal-label">
+        <span>Notes (optional)</span>
+        <input name="notes" type="text" placeholder="Add a note">
+      </label>
 
-    <div class="modal-actions">
-      <button class="secondary-btn" data-close="plan-modal">Cancel</button>
-      <button class="primary-btn save-plan-btn">Save</button>
-    </div>
+      <p id="transaction-form-error" class="form-error" role="alert"></p>
+
+      <div class="modal-actions">
+        <button class="secondary-btn" type="button" data-close="transaction-modal">Cancel</button>
+        <button class="primary-btn" type="submit">Add</button>
+      </div>
   </div>
 </div>
 
@@ -170,8 +173,10 @@
       <h3>Add transaction</h3>
       <button type="button" class="close-btn" data-close="transaction-modal">×</button>
     </div>
+      <input type="hidden" name="id" id="transaction-id" />
+        <form id="transaction-form">
+      <input type="hidden" name="id" id="transaction-id" />
 
-    <form id="transaction-form">
       <label class="modal-label">
         <span>Type</span>
         <select name="type" required>
