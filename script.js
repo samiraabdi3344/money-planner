@@ -1,5 +1,12 @@
 const STORAGE_KEY = "money-dashboard-transactions";
-let transactions = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+let transactions = [];
+
+try {
+  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+  transactions = Array.isArray(saved) ? saved : [];
+} catch (error) {
+  console.error("Could not load saved transactions:", error);
+}
 
 const BUDGET = 1200;
 // Unpaid bills reserve part of the remaining budget.
@@ -260,8 +267,11 @@ if (transactionForm) {
     renderDashboard();
 
     transactionForm.reset();
-    document.getElementById("transaction-id")?.value = "";
-    transactionModal.classList.add("hidden");
+
+const transactionIdInput = document.getElementById("transaction-id");
+if (transactionIdInput) transactionIdInput.value = "";
+
+transactionModal.classList.add("hidden");
   });
 }
 document.addEventListener("DOMContentLoaded", () => {
