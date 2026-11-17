@@ -25,10 +25,16 @@ const BUDGET = 1200;
 // Unpaid bills reserve part of the remaining budget.
 // When a bill is paid, mark it paid and record its expense transaction.
 const plannedBills = [
-  { name: "Rent", amount: 400, paid: false },
-  { name: "Phone", amount: 45, paid: false },
-  { name: "Internet", amount: 60, paid: false }
+  { name: "Rent", amount: 400, due: "20 Dec", paid: false },
+  { name: "Phone", amount: 45, due: "24 Dec", paid: false },
+  { name: "Internet", amount: 60, due: "25 Dec", paid: false }
 ];
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, char => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[char]));
+}
 function formatMoney(value) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -51,8 +57,8 @@ function getTotals() {
     .filter(bill => !bill.paid)
     .reduce((sum, bill) => sum + Number(bill.amount), 0);
 
-  const availableToPlan = Math.max(remaining - plannedReserve, 0);
-  const flexibleSpending = Math.max(availableToPlan - billsAllocated, 0);
+  // Free to spend = remaining budget - set-aside amount - unpaid bills
+  const flexibleSpending = Math.max(remaining - plannedReserve - billsAllocated, 0);
 
   return {
     budget: BUDGET,
@@ -61,7 +67,6 @@ function getTotals() {
     income,
     plannedReserve,
     billsAllocated,
-    availableToPlan,
     flexibleSpending
   };
 }
@@ -83,6 +88,16 @@ function renderSummaryCards() {
       element.textContent = formatMoney(value);
     }
   });
+}
+function renderBills() {
+  const list = document.getElementById("bill-list");
+  if (!list) return;
+
+  list.innerHTML = plannedBills
+    .filter(bill => !bill.paid)
+    .map(bill => `
+      <li><span>${escapeHtml(bill.name)} <time>${escapeHtml(bill.due)}</time></span><strong>${formatMoney(bill.amount)}</strong></li>
+    `).join("");
 }
 function renderRecentTransactions() {
   const list = document.getElementById("recent-transactions-list");
@@ -109,13 +124,13 @@ function renderRecentTransactions() {
 
     li.innerHTML = `
       <div class="transaction-info">
-        <span>${item.description}</span>
+        <span>${escapeHtml(item.description)}</span>
         <strong>${item.type === "expense" ? "-" : "+"}${formatMoney(item.amount)}</strong>
       </div>
 
       <div class="transaction-actions">
-        <button type="button" class="mini-btn edit-transaction" data-id="${item.id}">Edit</button>
-        <button type="button" class="mini-btn delete-transaction" data-id="${item.id}">Delete</button>
+        <button type="button" class="mini-btn edit-transaction" data-id="${escapeHtml(item.id)}">Edit</button>
+        <button type="button" class="mini-btn delete-transaction" data-id="${escapeHtml(item.id)}">Delete</button>
       </div>
     `;
 
@@ -166,6 +181,7 @@ function showTransactionFormError(message) {
 }
 function renderDashboard() {
   renderSummaryCards();
+  renderBills();
   renderRecentTransactions();
   renderSpendingByDate();
 }
@@ -406,7 +422,7 @@ function renderSpendingByDate() {
         ${transactions
           .filter(t => t.type === "expense" && t.date === date)
           .map(t => `
-            <li>${t.description} <span>${formatMoney(t.amount)}</span></li>
+            <li>${escapeHtml(t.description)} <span>${formatMoney(t.amount)}</span></li>
           `).join("")}
       </ul>
     </details>
