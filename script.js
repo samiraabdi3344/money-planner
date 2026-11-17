@@ -35,16 +35,26 @@ function formatMoney(value) {
     currency: "USD"
   }).format(value);
 }
+function getCurrentMonthTransactions() {
+  const today = new Date();
+  const month = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+
+  return transactions.filter(item =>
+    item.date && item.date.startsWith(`${month}-`)
+  );
+}
 function getTotals() {
-  const spent = transactions
+    const monthlyTransactions = getCurrentMonthTransactions();
+
+  const spent = monthlyTransactions
     .filter(item => item.type === "expense")
     .reduce((sum, item) => sum + Number(item.amount), 0);
 
-  const income = transactions
+  const income = monthlyTransactions
     .filter(item => item.type === "income")
     .reduce((sum, item) => sum + Number(item.amount), 0);
 
-  const remaining = BUDGET - spent;
+  const remaining = income - spent;
   const plannedReserve = Number(plannedBudget.amount || 0);
 
   const billsAllocated = plannedBills
@@ -55,7 +65,7 @@ function getTotals() {
   const flexibleSpending = Math.max(availableToPlan - billsAllocated, 0);
 
   return {
-    budget: BUDGET,
+    budget: income,
     spent,
     remaining,
     income,
@@ -391,7 +401,7 @@ document.querySelectorAll(".theme-option").forEach((button) => {
 
 applyTheme(savedTheme);
 function groupExpensesByDate() {
-  const grouped = transactions
+    const grouped = getCurrentMonthTransactions()
     .filter(t => t.type === "expense")
     .reduce((acc, item) => {
       const key = item.date;
