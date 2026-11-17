@@ -256,6 +256,38 @@ h3 { margin: 0; font-size: 1rem; letter-spacing: -0.02em; }
 .berry-light { background: linear-gradient(135deg,#ed91b0,#8bcac1); }
 .berry-dark { background: linear-gradient(135deg,#24181f,#512c3b); }
 
+/* Period controls, bills, history and form extras */
+[hidden] { display: none !important; }
+
+.period-controls { display: flex; align-items: center; gap: 6px; }
+.period-step { min-width: 40px; padding: 9px 12px; }
+.period-label { min-width: 150px; color: var(--text); font-size: 0.85rem; font-weight: 600; text-align: center; }
+
+.summary-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.summary-card-head p { margin: 0 0 8px; }
+
+.panel-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.set-aside-panel > .panel-buttons > .secondary-btn { margin-top: 0; }
+
+.bill-list li { flex-wrap: wrap; }
+.bill-list .bill-name { flex: 1; min-width: 120px; }
+.bill-actions { display: flex; align-items: center; gap: 6px; }
+.bill-list li.is-paid .bill-name, .bill-list li.is-paid > strong { opacity: 0.55; text-decoration: line-through; }
+
+.allocation-list { margin-bottom: 14px; }
+.allocation-list .allocation-name { flex: 1; min-width: 0; }
+.allocation-list li > strong { color: var(--text); }
+
+.checkbox-label { display: flex; align-items: center; gap: 8px; }
+.checkbox-label input { width: auto; min-height: 0; }
+.checkbox-label span { display: inline; margin: 0; }
+.modal-hint { margin: -4px 0 8px; color: var(--muted); font-size: 0.8rem; }
+
+.history-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0 14px; }
+.history-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.history-count { margin: 0; color: var(--muted); font-size: 0.85rem; }
+.transaction-info > span { min-width: 0; }
+
 @media (max-width: 900px) {
   .app-shell { display: block; }
   .sidebar { width: 100%; min-height: auto; padding: 14px 18px; border-right: 0; border-bottom: 1px solid var(--border); }

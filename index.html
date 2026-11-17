@@ -10,14 +10,14 @@
   <body>
     <div class="app-shell">
       <aside class="sidebar">
-        <a class="brand" href="#overview">Money dashboard</a>
+        <a class="brand" href="#" data-nav="overview">Money dashboard</a>
         <nav class="nav" aria-label="Main navigation">
-          <a class="nav-item active" href="#overview">Overview</a>
-          <a class="nav-item" href="#recent-transactions">Transactions</a>
-          <a class="nav-item" href="#monthly-summary">Budget</a>
-          <a class="nav-item" href="#spending-by-date">Insights</a>
-          <a class="nav-item" href="#set-aside">Earnings</a>
-          <a class="nav-item" href="#set-aside">Saver</a>
+          <a class="nav-item active" href="#" data-nav="overview">Overview</a>
+          <a class="nav-item" href="#" data-nav="transactions">Transactions</a>
+          <a class="nav-item" href="#" data-nav="budget">Budget</a>
+          <a class="nav-item" href="#" data-nav="insights">Insights</a>
+          <a class="nav-item" href="#" data-nav="earnings">Earnings</a>
+          <a class="nav-item" href="#" data-nav="saver">Saver</a>
         </nav>
       </aside>
 
@@ -28,82 +28,153 @@
             <h1>Hi, Samira</h1>
           </div>
           <div class="topbar-actions">
-            <label class="period-picker">
+            <div class="period-picker">
               <span>Planning period</span>
-              <select id="period-select" aria-label="Planning period"></select>
-            </label>
+              <div class="period-controls">
+                <select id="period-type" aria-label="Period length">
+                  <option value="month">Monthly</option>
+                  <option value="fortnight">Fortnightly</option>
+                  <option value="week">Weekly</option>
+                </select>
+                <button id="period-prev" class="secondary-btn period-step" type="button" aria-label="Previous period">‹</button>
+                <span id="period-label" class="period-label" aria-live="polite"></span>
+                <button id="period-next" class="secondary-btn period-step" type="button" aria-label="Next period">›</button>
+              </div>
+            </div>
             <button id="theme-toggle-btn" class="secondary-btn" type="button">Theme</button>
             <button id="add-transaction-btn" class="primary-btn" type="button">+ Add transaction</button>
           </div>
         </header>
 
-        <section class="summary-grid" id="monthly-summary" aria-label="Monthly summary">
-          <article class="summary-card">
-            <p>Budget</p>
-            <strong id="budget-total">$1,200</strong>
-            <span>Your plan for this month</span>
-          </article>
-          <article class="summary-card">
-            <p>Spent</p>
-            <strong id="spent-total">$0</strong>
-            <span>Recorded expenses</span>
-          </article>
-          <article class="summary-card">
-            <p>Remaining</p>
-            <strong id="remaining-total">$1,200</strong>
-            <span>Budget minus spending</span>
-          </article>
-        </section>
-
-        <section class="plan-grid" aria-label="Money plan">
-          <article class="panel panel-highlight available-panel">
-            <p class="eyebrow">Money left to assign</p>
-            <h2>Available for planning + spending</h2>
-            <strong id="available-to-plan">$0</strong>
-            <p>After your set-aside amount and upcoming bills.</p>
-          </article>
-
-          <article class="panel set-aside-panel" id="set-aside">
-            <div class="set-aside-heading">
-              <div>
-                <p class="eyebrow">Your plan</p>
-                <h2>Set aside total</h2>
+        <div id="overview-view">
+          <section class="summary-grid" id="monthly-summary" aria-label="Period summary">
+            <article class="summary-card">
+              <div class="summary-card-head">
+                <p>Budget</p>
+                <button id="edit-budget-btn" class="mini-btn" type="button">Edit</button>
               </div>
-              <strong id="planned-amount-total">$0</strong>
-            </div>
-            <p id="planned-note-display" class="set-aside-note">For savings or another goal.</p>
-
-            <div class="upcoming-heading">
-              <div>
-                <h3>Coming up</h3>
-                <p>Upcoming bills</p>
-              </div>
-              <strong id="bills-allocated">$0</strong>
-            </div>
-            <ul class="bill-list" id="upcoming-bills-list"></ul>
-            <button id="plan-amount-btn" class="secondary-btn" type="button">Plan an amount</button>
-          </article>
-        </section>
-
-        <div class="bottom-grid">
-          <section class="panel spending-panel" id="spending-by-date">
-            <div class="panel-head">
-              <div>
-                <p class="eyebrow">Your spending</p>
-                <h2>Total spending by date</h2>
-              </div>
-            </div>
-            <div id="spending-by-date-list" aria-live="polite"></div>
+              <strong id="budget-total">$0</strong>
+              <span id="budget-note">Your plan for this period</span>
+            </article>
+            <article class="summary-card">
+              <p>Spent</p>
+              <strong id="spent-total">$0</strong>
+              <span>Recorded expenses</span>
+            </article>
+            <article class="summary-card">
+              <p>Remaining</p>
+              <strong id="remaining-total">$0</strong>
+              <span>Budget minus spending</span>
+            </article>
           </section>
 
-          <section class="panel activity-panel" id="recent-transactions">
+          <section class="plan-grid" aria-label="Money plan">
+            <article class="panel panel-highlight available-panel">
+              <p class="eyebrow">Money left to assign</p>
+              <h2>Available for planning + spending</h2>
+              <strong id="available-to-plan">$0</strong>
+              <p>After your set-aside amount and upcoming bills.</p>
+            </article>
+
+            <article class="panel set-aside-panel" id="set-aside">
+              <div class="set-aside-heading">
+                <div>
+                  <p class="eyebrow">Your plan</p>
+                  <h2>Set aside total</h2>
+                </div>
+                <strong id="planned-amount-total">$0</strong>
+              </div>
+              <p id="planned-note-display" class="set-aside-note">For savings or another goal.</p>
+
+              <div class="upcoming-heading">
+                <div>
+                  <h3>Coming up</h3>
+                  <p>Unpaid bills due this period</p>
+                </div>
+                <strong id="bills-allocated">$0</strong>
+              </div>
+              <ul class="bill-list" id="upcoming-bills-list"></ul>
+              <div class="panel-buttons">
+                <button id="plan-amount-btn" class="secondary-btn" type="button">Plan an amount</button>
+                <button id="add-bill-btn" class="secondary-btn" type="button">+ Add bill</button>
+              </div>
+            </article>
+          </section>
+
+          <div class="bottom-grid">
+            <section class="panel spending-panel" id="spending-by-date">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">Your spending</p>
+                  <h2>Total spending by date</h2>
+                </div>
+                <a href="#" data-nav="transactions" data-type="expense">View all</a>
+              </div>
+              <div id="spending-by-date-list" aria-live="polite"></div>
+            </section>
+
+            <section class="panel activity-panel" id="recent-transactions">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">Latest activity</p>
+                  <h2>Recent transactions</h2>
+                </div>
+                <a href="#" data-nav="transactions">View all</a>
+              </div>
+              <ul class="recent-list" id="recent-transactions-list" aria-live="polite"></ul>
+            </section>
+          </div>
+        </div>
+
+        <div id="history-view" hidden>
+          <section class="panel history-panel">
             <div class="panel-head">
               <div>
-                <p class="eyebrow">Latest activity</p>
-                <h2>Recent transactions</h2>
+                <p class="eyebrow">All activity</p>
+                <h2>Transaction history</h2>
               </div>
+              <a href="#" data-nav="overview">Back to overview</a>
             </div>
-            <ul class="recent-list" id="recent-transactions-list" aria-live="polite"></ul>
+            <div class="history-filters">
+              <label class="modal-label">
+                <span>Search</span>
+                <input id="history-search" type="search" placeholder="Description, category or notes" />
+              </label>
+              <label class="modal-label">
+                <span>Type</span>
+                <select id="history-type">
+                  <option value="all">All</option>
+                  <option value="expense">Expenses</option>
+                  <option value="income">Income</option>
+                </select>
+              </label>
+              <label class="modal-label">
+                <span>Category</span>
+                <select id="history-category"></select>
+              </label>
+              <label class="modal-label">
+                <span>From</span>
+                <input id="history-from" type="date" />
+              </label>
+              <label class="modal-label">
+                <span>To</span>
+                <input id="history-to" type="date" />
+              </label>
+              <label class="modal-label">
+                <span>Sort by</span>
+                <select id="history-sort">
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                  <option value="highest">Highest amount</option>
+                  <option value="lowest">Lowest amount</option>
+                </select>
+              </label>
+            </div>
+            <div class="history-summary">
+              <p id="history-count" class="history-count" aria-live="polite"></p>
+              <button id="history-clear" class="secondary-btn" type="button">Clear filters</button>
+            </div>
+            <ul class="recent-list" id="history-list"></ul>
           </section>
         </div>
       </main>
@@ -115,18 +186,77 @@
           <h3 id="plan-modal-title">Plan an amount</h3>
           <button type="button" class="close-btn" data-close="plan-modal" aria-label="Close">×</button>
         </div>
-        <label class="modal-label">
-          <span>How much do you want to set aside?</span>
-          <input id="planned-amount" type="number" min="0" step="0.01" value="0" />
-        </label>
-        <label class="modal-label">
-          <span>Note</span>
-          <input id="planned-note" type="text" placeholder="Savings, travel, or another goal" />
-        </label>
-        <div class="modal-actions">
-          <button class="secondary-btn" type="button" data-close="plan-modal">Cancel</button>
-          <button type="button" class="primary-btn save-plan-btn">Save</button>
+        <ul class="mini-list allocation-list" id="allocation-list"></ul>
+        <form id="allocation-form" novalidate>
+          <div id="allocation-form-error" class="form-error" aria-live="polite"></div>
+          <input type="hidden" id="allocation-id" />
+          <label class="modal-label">
+            <span>Note</span>
+            <input id="planned-note" type="text" placeholder="Savings, travel, or another goal" />
+          </label>
+          <label class="modal-label">
+            <span>How much do you want to set aside each month?</span>
+            <input id="planned-amount" type="number" min="0.01" step="0.01" placeholder="500" />
+          </label>
+          <div class="modal-actions">
+            <button class="secondary-btn" type="button" data-close="plan-modal">Close</button>
+            <button type="submit" class="primary-btn" id="allocation-submit-btn">Add</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal hidden" id="bill-modal" role="dialog" aria-modal="true" aria-labelledby="bill-modal-title">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 id="bill-modal-title">Add bill</h3>
+          <button type="button" class="close-btn" data-close="bill-modal" aria-label="Close">×</button>
         </div>
+        <form id="bill-form" novalidate>
+          <div id="bill-form-error" class="form-error" aria-live="polite"></div>
+          <input type="hidden" name="id" />
+          <label class="modal-label">
+            <span>Bill name</span>
+            <input name="name" type="text" placeholder="Rent" required />
+          </label>
+          <label class="modal-label">
+            <span>Amount</span>
+            <input name="amount" type="number" min="0.01" step="0.01" placeholder="400.00" required />
+          </label>
+          <label class="modal-label">
+            <span>Due date</span>
+            <input name="due" type="date" required />
+          </label>
+          <label class="modal-label checkbox-label">
+            <input name="recurring" type="checkbox" />
+            <span>Repeats every month</span>
+          </label>
+          <div class="modal-actions">
+            <button class="secondary-btn" type="button" data-close="bill-modal">Cancel</button>
+            <button class="primary-btn" type="submit" id="bill-submit-btn">Add</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal hidden" id="budget-modal" role="dialog" aria-modal="true" aria-labelledby="budget-modal-title">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 id="budget-modal-title">Edit monthly budget</h3>
+          <button type="button" class="close-btn" data-close="budget-modal" aria-label="Close">×</button>
+        </div>
+        <form id="budget-form" novalidate>
+          <div id="budget-form-error" class="form-error" aria-live="polite"></div>
+          <label class="modal-label">
+            <span>Spending budget for one month</span>
+            <input id="budget-input" type="number" min="0" step="0.01" placeholder="1200" />
+          </label>
+          <p class="modal-hint">Weekly and fortnightly views use a share of this amount.</p>
+          <div class="modal-actions">
+            <button class="secondary-btn" type="button" data-close="budget-modal">Cancel</button>
+            <button class="primary-btn" type="submit">Save</button>
+          </div>
+        </form>
       </div>
     </div>
 
