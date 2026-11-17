@@ -9,6 +9,7 @@ const KEYS = {
   categories: "money-dashboard-categories",
   categoryBudgets: "money-dashboard-category-budgets",
   goals: "money-dashboard-goals",
+  subscriptions: "money-dashboard-subscriptions",
   period: "money-dashboard-period",
   seeded: "money-dashboard-seeded",
   theme: "money-dashboard-theme"
@@ -118,6 +119,8 @@ let allocations = load(KEYS.allocations, null);
 let categories = load(KEYS.categories, ["Bills", "Eating out", "Groceries", "Income", "Other", "Transport"]);
 let categoryBudgets = load(KEYS.categoryBudgets, []);
 let goals = load(KEYS.goals, []);
+let subscriptions = load(KEYS.subscriptions, []);
+let chartMode = "bars";
 let monthlyBudget = validAmount(load(KEYS.budget, DEFAULT_BUDGET), true) ?? DEFAULT_BUDGET;
 let periodType = load(KEYS.period, "month");
 if (!FACTORS[periodType]) periodType = "month";
@@ -133,6 +136,7 @@ if (!Array.isArray(allocations)) {
 if (!Array.isArray(categories)) categories = [];
 if (!Array.isArray(categoryBudgets)) categoryBudgets = [];
 if (!Array.isArray(goals)) goals = [];
+if (!Array.isArray(subscriptions)) subscriptions = [];
 
 if (localStorage.getItem(KEYS.seeded) === null) {
   if (!transactions.length) {
@@ -247,6 +251,34 @@ function renderSummary() {
   if ($("period-type")) $("period-type").value = periodType;
   const r = periodRange();
   if ($("period-label")) $("period-label").textContent = labelPeriod(r);
+  renderSafeToSpend(t);
+}
+function daysBetween(from, to) {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000);
+}
+function renderSafeToSpend(t) {
+  const strong = $("safe-daily");
+  if (!strong) return;
+  const range = periodRange();
+  const now = today();
+  if (now > range.end) {
+    strong.textContent = money(0);
+    $("safe-note").textContent = "This period has ended";
+    return;
+  }
+  const first = now > range.start ? now : range.start;
+  const days = daysBetween(first, range.end) + 1;
+  const spentToday = transactions.filter((x) => x.type === "expense" && x.date === now).reduce((sum, x) => sum + x.amount, 0);
+  const pool = t.available + (now >= range.start ? spentToday : 0);
+  if (pool <= 0) {
+    strong.textContent = money(0);
+    $("safe-note").textContent = "Nothing left to assign this period";
+    return;
+  }
+  const allowance = pool / days;
+  const left = now >= range.start ? allowance - spentToday : allowance;
+  strong.textContent = money(Math.max(0, left));
+  $("safe-note").textContent = `${money(allowance)} a day · ${days} day${days === 1 ? "" : "s"} left · ${money(allowance * 7)} a week`;
 }
 function renderAllocations() {
   const list = $("allocation-list");
@@ -372,20 +404,39 @@ function renderCategoryBudgets() {
 }
 
 /* Savings goals */
+const MILESTONES = [25, 50, 75, 100];
+function goalDetails(goal) {
+  const remaining = Math.max(0, goal.target - goal.saved);
+  const percent = Math.min(100, Math.round(goal.saved / goal.target * 100));
+  let timing = "";
+  if (remaining === 0) timing = "Goal reached — well done!";
+  else if (goal.deadline && validDate(goal.deadline)) {
+    const days = daysBetween(today(), goal.deadline);
+    if (days < 0) timing = `Target date passed · ${money(remaining)} still to save`;
+    else {
+      const months = Math.max(days / 30.44, 1);
+      timing = `${days} day${days === 1 ? "" : "s"} to go · save ${money(remaining / months)} a month`;
+    }
+  }
+  return { remaining, percent, timing };
+}
 function renderGoals() {
   const list = $("savings-goal-list");
   if (!list) return;
   list.innerHTML = goals.length ? goals.map((goal) => {
-    const percent = Math.min(100, Math.round(goal.saved / goal.target * 100));
-    return `<article class="goal-card">
+    const { remaining, percent, timing } = goalDetails(goal);
+    const marks = MILESTONES.map((m) => `<li class="${percent >= m ? "reached" : ""}">${m}%</li>`).join("");
+    return `<article class="goal-card ${remaining === 0 ? "goal-complete" : ""}">
       <div class="category-budget-head"><strong>${esc(goal.name)}</strong><span>${money(goal.saved)} / ${money(goal.target)}</span></div>
       <progress max="100" value="${percent}" aria-label="${esc(goal.name)} ${percent}% saved"></progress>
-      <div class="category-budget-foot"><span>${percent}% saved</span>
+      <ul class="milestones" aria-label="Milestones">${marks}</ul>
+      <div class="category-budget-foot"><span>${percent}% saved · ${money(remaining)} left</span>
         <span class="transaction-actions">
           <button class="mini-btn edit-goal" data-id="${esc(goal.id)}" type="button">Edit</button>
           <button class="mini-btn delete-goal" data-id="${esc(goal.id)}" type="button">Delete</button>
         </span>
       </div>
+      ${timing ? `<small class="goal-timing">${esc(timing)}</small>` : ""}
     </article>`;
   }).join("") : `<p class="empty-state">No savings goals yet.</p>`;
 }
@@ -399,10 +450,7 @@ function renderInsights() {
   const categoriesSorted = Object.entries(categorySums).sort((a, b) => b[1] - a[1]);
   const maxCategory = Math.max(1, ...categoriesSorted.map(([, value]) => value));
 
-  const catChart = $("category-chart");
-  if (catChart) catChart.innerHTML = categoriesSorted.length ? categoriesSorted.map(([name, value]) => `
-    <div class="chart-row"><span>${esc(name)}</span><span class="chart-track"><i style="width:${Math.round(value / maxCategory * 100)}%"></i></span><strong>${money(value)}</strong></div>`
-  ).join("") : `<p class="empty-state">No expense data in this period.</p>`;
+  renderCategoryChart(categoriesSorted, maxCategory);
 
   const trendChart = $("trend-chart");
   if (trendChart) {
@@ -435,6 +483,7 @@ function renderInsights() {
     const difference = t.spent - prevSpent;
     node.textContent = `You spent ${money(Math.abs(difference))} ${difference > 0 ? "more" : difference < 0 ? "less" : "the same"} than in the previous period (${money(prevSpent)}).`;
   }
+  renderInsightStats(t, range);
   const personal = $("personal-insight");
   if (personal) {
     if (!categoriesSorted.length) personal.textContent = "Add expenses to see personalized spending insights.";
@@ -443,6 +492,56 @@ function renderInsights() {
       personal.textContent = `Your highest spending category this period is ${top} at ${money(value)}.`;
     }
   }
+}
+
+const PALETTE = ["#7b67d9", "#4a9b70", "#d58a26", "#c44747", "#3f8fb5", "#b0579a", "#8a9a3b", "#6b6b78"];
+function renderCategoryChart(sorted, max) {
+  const chart = $("category-chart");
+  if (!chart) return;
+  if (!sorted.length) {
+    chart.innerHTML = `<p class="empty-state">No expense data in this period.</p>`;
+    return;
+  }
+  const total = sorted.reduce((sum, [, value]) => sum + value, 0);
+  if (chartMode === "pie") {
+    let angle = 0;
+    const stops = sorted.map(([, value], i) => {
+      const start = angle;
+      angle += value / total * 360;
+      return `${PALETTE[i % PALETTE.length]} ${start}deg ${angle}deg`;
+    }).join(", ");
+    chart.innerHTML = `<div class="pie" role="img" aria-label="Spending by category pie chart" style="background:conic-gradient(${stops})"></div>
+      <ul class="pie-legend">${sorted.map(([name, value], i) => `<li><button type="button" class="chart-link" data-category="${esc(name)}" title="${esc(name)}: ${money(value)} (${Math.round(value / total * 100)}%)">
+        <i style="background:${PALETTE[i % PALETTE.length]}"></i><span>${esc(name)}</span><strong>${Math.round(value / total * 100)}%</strong></button></li>`).join("")}</ul>`;
+  } else {
+    chart.innerHTML = sorted.map(([name, value]) => `
+      <button type="button" class="chart-row chart-link" data-category="${esc(name)}" title="${esc(name)}: ${money(value)} (${Math.round(value / total * 100)}% of spending)">
+        <span>${esc(name)}</span><span class="chart-track"><i style="width:${Math.round(value / max * 100)}%"></i></span><strong>${money(value)}</strong></button>`).join("");
+  }
+}
+function renderInsightStats(t, range) {
+  const node = $("insight-stats");
+  if (!node) return;
+  const now = today();
+  const elapsed = now < range.start ? 0 : Math.min(daysBetween(range.start, now), daysBetween(range.start, range.end)) + 1;
+  const length = daysBetween(range.start, range.end) + 1;
+  const daily = elapsed ? t.spent / elapsed : 0;
+  const months = {};
+  transactions.filter((x) => x.type === "expense").forEach((x) => { months[x.date.slice(0, 7)] = (months[x.date.slice(0, 7)] || 0) + x.amount; });
+  const monthValues = Object.values(months);
+  const avgMonth = monthValues.length ? monthValues.reduce((a, b) => a + b, 0) / monthValues.length : 0;
+  const saved = t.income > 0 ? Math.round((t.income - t.spent) / t.income * 100) : null;
+  const used = t.budget > 0 ? Math.round(t.spent / t.budget * 100) : 0;
+  const projected = elapsed && now <= range.end ? daily * length : t.spent;
+  const stats = [
+    ["Average daily spending", money(daily)],
+    ["Average weekly spending", money(daily * 7)],
+    ["Average monthly spending", money(avgMonth)],
+    ["Projected spending this period", money(projected)],
+    ["Planned vs actual", `${money(t.spent)} of ${money(t.budget)} (${used}%)`],
+    ["Income saved", saved === null ? "Add income to see this" : `${saved}%`]
+  ];
+  node.innerHTML = stats.map(([label, value]) => `<div class="stat"><span>${label}</span><strong>${esc(value)}</strong></div>`).join("");
 }
 
 /* Transaction history and filters */
@@ -483,6 +582,7 @@ function render() {
   renderTransactions();
   renderCategoryBudgets();
   renderGoals();
+  renderSubscriptions();
   renderInsights();
   renderHistory();
 }
@@ -695,6 +795,7 @@ function openGoal(id = "") {
   $("goal-name").value = goal?.name || "";
   $("goal-target").value = goal?.target || "";
   $("goal-saved").value = goal?.saved || 0;
+  $("goal-deadline").value = goal?.deadline || "";
   $("goal-modal-title").textContent = goal ? "Edit savings goal" : "Add savings goal";
   openModal("goal-modal");
 }
@@ -706,7 +807,9 @@ $("goal-form")?.addEventListener("submit", (event) => {
   const target = validAmount($("goal-target").value);
   const savedAmount = validAmount($("goal-saved").value, true);
   if (!name || !target || savedAmount === null) return formError("goal-form-error", "Enter a name, a target and a saved amount of zero or more.");
-  const goal = { id: id || uid(), name, target, saved: savedAmount };
+  const deadline = $("goal-deadline").value;
+  if (deadline && !validDate(deadline)) return formError("goal-form-error", "Enter a valid target date or leave it empty.");
+  const goal = { id: id || uid(), name, target, saved: savedAmount, ...(deadline ? { deadline } : {}) };
   goals = id ? goals.map((g) => g.id === id ? goal : g) : [...goals, goal];
   save(KEYS.goals, goals);
   render();
@@ -769,6 +872,8 @@ function view(name) {
   if (name === "budget") $("category-budgets").scrollIntoView({ behavior: "smooth" });
   if (name === "insights") $("insights-panel").scrollIntoView({ behavior: "smooth" });
   if (name === "saver") $("savings-goals").scrollIntoView({ behavior: "smooth" });
+  if (name === "subscriptions") $("subscriptions-panel").scrollIntoView({ behavior: "smooth" });
+  if (name === "tools") $("tools-panel").scrollIntoView({ behavior: "smooth" });
   document.querySelectorAll(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.nav === name));
   renderHistory();
 }
@@ -789,7 +894,7 @@ $("period-next")?.addEventListener("click", () => stepPeriod(1));
 $("export-data-btn")?.addEventListener("click", () => {
   const backup = {
     version: 1, exportedAt: new Date().toISOString(), transactions, bills, allocations,
-    monthlyBudget, categories, categoryBudgets, goals, theme: localStorage.getItem(KEYS.theme)
+    monthlyBudget, categories, categoryBudgets, goals, subscriptions, theme: localStorage.getItem(KEYS.theme)
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -815,10 +920,11 @@ $("import-data-input")?.addEventListener("change", async (event) => {
     categories = Array.isArray(data.categories) ? data.categories : [];
     categoryBudgets = Array.isArray(data.categoryBudgets) ? data.categoryBudgets : [];
     goals = Array.isArray(data.goals) ? data.goals : [];
+    subscriptions = Array.isArray(data.subscriptions) ? data.subscriptions.map(cleanSubscription).filter(Boolean) : [];
     monthlyBudget = validAmount(data.monthlyBudget, true) ?? DEFAULT_BUDGET;
     saveTransactions(); saveBills(); savePlan();
     save(KEYS.categories, categories); save(KEYS.categoryBudgets, categoryBudgets);
-    save(KEYS.goals, goals); save(KEYS.budget, monthlyBudget);
+    save(KEYS.goals, goals); save(KEYS.subscriptions, subscriptions); save(KEYS.budget, monthlyBudget);
     if (THEMES.includes(data.theme)) applyTheme(data.theme);
     render();
     showMessage("backup-message", "Backup restored.");
@@ -844,6 +950,205 @@ document.querySelectorAll(".theme-option").forEach((button) => button.addEventLi
   closeModal("theme-modal");
 }));
 applyTheme(THEMES.includes(localStorage.getItem(KEYS.theme)) ? localStorage.getItem(KEYS.theme) : "theme-botanical-light");
+
+/* Subscriptions */
+const CYCLES = {
+  monthly: { label: "Monthly", perMonth: 1 },
+  yearly: { label: "Yearly", perMonth: 1 / 12 },
+  fortnightly: { label: "Fortnightly", perMonth: 26 / 12 },
+  weekly: { label: "Weekly", perMonth: 52 / 12 }
+};
+function cleanSubscription(item) {
+  if (!item || !String(item.name || "").trim() || !validAmount(item.amount) ||
+      !CYCLES[item.cycle] || !validDate(item.date)) return null;
+  return { id: String(item.id || uid()), name: String(item.name).trim(), amount: Number(item.amount), cycle: item.cycle, date: item.date };
+}
+subscriptions = subscriptions.map(cleanSubscription).filter(Boolean);
+function addMonthsKeepDay(date, months, day) {
+  const y = Number(date.slice(0, 4));
+  const m = Number(date.slice(5, 7)) - 1 + months;
+  const last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  const target = new Date(Date.UTC(y, m, 1));
+  return `${target.getUTCFullYear()}-${pad(target.getUTCMonth() + 1)}-${pad(Math.min(day, last))}`;
+}
+function nextRenewal(sub) {
+  const now = today();
+  const day = Number(sub.date.slice(8, 10));
+  for (let i = 0; i < 6000; i++) {
+    const candidate = sub.cycle === "monthly" ? addMonthsKeepDay(sub.date, i, day)
+      : sub.cycle === "yearly" ? addMonthsKeepDay(sub.date, i * 12, day)
+      : addDays(sub.date, i * (sub.cycle === "weekly" ? 7 : 14));
+    if (candidate >= now) return candidate;
+  }
+  return sub.date;
+}
+function renderSubscriptions() {
+  const list = $("subscription-list");
+  if (!list) return;
+  const items = subscriptions.map((sub) => ({ sub, next: nextRenewal(sub) })).sort((a, b) => a.next.localeCompare(b.next));
+  const monthly = subscriptions.reduce((sum, sub) => sum + sub.amount * CYCLES[sub.cycle].perMonth, 0);
+  if ($("sub-monthly")) $("sub-monthly").textContent = money(monthly);
+  if ($("sub-yearly")) $("sub-yearly").textContent = money(monthly * 12);
+  list.innerHTML = items.length ? items.map(({ sub, next }) => {
+    const days = daysBetween(today(), next);
+    const soon = days <= 7;
+    const when = days === 0 ? "Renews today" : days === 1 ? "Renews tomorrow" : `Renews in ${days} days`;
+    return `<li class="${soon ? "due-soon" : ""}">
+      <span class="bill-name">${esc(sub.name)}<time datetime="${next}">${esc(when)} · ${formatDate(next, { day: "numeric", month: "short" })} · ${CYCLES[sub.cycle].label.toLowerCase()} · ${money(sub.amount * CYCLES[sub.cycle].perMonth)}/month</time></span>
+      <strong>${money(sub.amount)}</strong>
+      <span class="bill-actions">
+        <button class="mini-btn edit-subscription" data-id="${esc(sub.id)}" type="button">Edit</button>
+        <button class="mini-btn delete-subscription" data-id="${esc(sub.id)}" type="button">Delete</button>
+      </span>
+    </li>`;
+  }).join("") : `<li class="empty-state">No subscriptions yet. Add streaming, apps or memberships to see what they cost each year.</li>`;
+}
+function openSubscription(id = "") {
+  const sub = subscriptions.find((x) => x.id === id);
+  $("subscription-form").reset();
+  $("subscription-id").value = sub?.id || "";
+  $("subscription-name").value = sub?.name || "";
+  $("subscription-amount").value = sub?.amount || "";
+  $("subscription-cycle").value = sub?.cycle || "monthly";
+  $("subscription-date").value = sub?.date || today();
+  $("subscription-modal-title").textContent = sub ? "Edit subscription" : "Add subscription";
+  formError("subscription-form-error", "");
+  openModal("subscription-modal");
+}
+$("add-subscription-btn")?.addEventListener("click", () => openSubscription());
+$("subscription-form")?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const id = $("subscription-id").value;
+  const sub = cleanSubscription({
+    id: id || uid(), name: $("subscription-name").value, amount: $("subscription-amount").value,
+    cycle: $("subscription-cycle").value, date: $("subscription-date").value
+  });
+  if (!sub) return formError("subscription-form-error", "Enter a name, a cost above zero and a valid renewal date.");
+  subscriptions = id ? subscriptions.map((x) => x.id === id ? sub : x) : [...subscriptions, sub];
+  save(KEYS.subscriptions, subscriptions);
+  render();
+  closeModal("subscription-modal");
+});
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (!button) return;
+  if (button.matches(".edit-subscription")) openSubscription(button.dataset.id);
+  else if (button.matches(".delete-subscription") && confirm("Delete this subscription?")) {
+    subscriptions = subscriptions.filter((x) => x.id !== button.dataset.id);
+    save(KEYS.subscriptions, subscriptions);
+    render();
+  }
+});
+
+/* Interactive insights */
+document.addEventListener("click", (event) => {
+  const mode = event.target.closest("[data-chart-mode]");
+  if (mode) {
+    chartMode = mode.dataset.chartMode;
+    document.querySelectorAll("[data-chart-mode]").forEach((b) => b.classList.toggle("active", b === mode));
+    renderInsights();
+    return;
+  }
+  const link = event.target.closest(".chart-link");
+  if (link) {
+    const range = periodRange();
+    view("transactions");
+    $("history-category").value = link.dataset.category;
+    $("history-type").value = "expense";
+    $("history-from").value = range.start;
+    $("history-to").value = range.end;
+    renderHistory();
+  }
+});
+
+/* Financial calculators */
+const rate = (value) => Number(value) / 1200;
+const CALCULATORS = [
+  {
+    id: "savings", name: "Savings goal calculator", help: "How long will it take to reach a savings target?",
+    fields: [["target", "Target amount", 5000], ["current", "Already saved", 0], ["monthly", "Saving each month", 250], ["rate", "Interest rate per year (%)", 0]],
+    run(v) {
+      if (v.target <= v.current) return [["Result", "You have already reached this target"]];
+      if (v.monthly <= 0) return [["Result", "Enter a monthly saving amount above zero"]];
+      let balance = v.current, months = 0;
+      while (balance < v.target && months < 1200) { balance = balance * (1 + rate(v.rate)) + v.monthly; months++; }
+      if (months >= 1200) return [["Result", "This would take more than 100 years"]];
+      const date = shiftMonth(`${today().slice(0, 7)}-01`, months);
+      return [["Time needed", `${Math.floor(months / 12)} years ${months % 12} months`], ["Target reached around", formatDate(date, { month: "long", year: "numeric" })], ["Total you save", money(v.monthly * months)]];
+    }
+  },
+  {
+    id: "compound", name: "Compound interest", help: "See how savings can grow when interest is added each month.",
+    fields: [["principal", "Starting amount", 1000], ["monthly", "Added each month", 100], ["rate", "Interest rate per year (%)", 5], ["years", "Years", 10]],
+    run(v) {
+      let balance = v.principal;
+      for (let i = 0; i < Math.round(v.years * 12); i++) balance = balance * (1 + rate(v.rate)) + v.monthly;
+      const put = v.principal + v.monthly * Math.round(v.years * 12);
+      return [["Final balance", money(balance)], ["Total you put in", money(put)], ["Interest earned", money(balance - put)]];
+    }
+  },
+  {
+    id: "loan", name: "Loan repayment", help: "Estimate monthly repayments and total interest on a loan.",
+    fields: [["amount", "Amount borrowed", 10000], ["rate", "Interest rate per year (%)", 7], ["years", "Loan length (years)", 5]],
+    run(v) {
+      const n = Math.round(v.years * 12);
+      if (v.amount <= 0 || n <= 0) return [["Result", "Enter an amount and loan length above zero"]];
+      const r = rate(v.rate);
+      const payment = r === 0 ? v.amount / n : v.amount * r / (1 - Math.pow(1 + r, -n));
+      return [["Monthly repayment", money(payment)], ["Total repaid", money(payment * n)], ["Total interest", money(payment * n - v.amount)]];
+    }
+  },
+  {
+    id: "split", name: "Split a bill", help: "Share a bill between friends, with an optional tip.",
+    fields: [["total", "Bill total", 120], ["people", "Number of people", 4], ["tip", "Tip (%)", 0]],
+    run(v) {
+      const people = Math.floor(v.people);
+      if (people < 1) return [["Result", "Enter at least one person"]];
+      const total = v.total * (1 + v.tip / 100);
+      return [["Each person pays", money(total / people)], ["Total including tip", money(total)]];
+    }
+  },
+  {
+    id: "percent", name: "Percentage", help: "Work out a percentage of an amount.",
+    fields: [["percent", "Percentage (%)", 15], ["of", "Of amount", 200]],
+    run: (v) => [["Result", money(v.percent / 100 * v.of)], ["Amount remaining", money(v.of - v.percent / 100 * v.of)]]
+  },
+  {
+    id: "income", name: "Income converter", help: "Convert pay between weekly, fortnightly, monthly and yearly.",
+    fields: [["amount", "Pay amount", 800], ["period", "How often you are paid", "weekly", { weekly: "Weekly", fortnightly: "Fortnightly", monthly: "Monthly", yearly: "Yearly" }]],
+    run(v) {
+      const yearly = v.amount * { weekly: 52, fortnightly: 26, monthly: 12, yearly: 1 }[v.period];
+      return [["Weekly", money(yearly / 52)], ["Fortnightly", money(yearly / 26)], ["Monthly", money(yearly / 12)], ["Yearly", money(yearly)]];
+    }
+  }
+];
+function currentCalculator() {
+  return CALCULATORS.find((c) => c.id === $("calc-type").value) || CALCULATORS[0];
+}
+function renderCalculatorForm() {
+  const calc = currentCalculator();
+  $("calc-help").textContent = calc.help;
+  $("calc-form").innerHTML = calc.fields.map(([key, label, value, options]) => options
+    ? `<label class="modal-label"><span>${esc(label)}</span><select name="${key}">${Object.entries(options).map(([k, t]) => `<option value="${k}" ${k === value ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label>`
+    : `<label class="modal-label"><span>${esc(label)}</span><input name="${key}" type="number" step="any" min="0" value="${value}" /></label>`).join("");
+  runCalculator();
+}
+function runCalculator() {
+  const calc = currentCalculator();
+  const values = {};
+  calc.fields.forEach(([key, , , options]) => {
+    const field = $("calc-form").elements[key];
+    values[key] = options ? field.value : Number(field.value) || 0;
+  });
+  $("calc-result").innerHTML = `<dl>${calc.run(values).map(([label, value]) => `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join("")}</dl>`;
+}
+if ($("calc-type")) {
+  $("calc-type").innerHTML = CALCULATORS.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join("");
+  $("calc-type").addEventListener("change", renderCalculatorForm);
+  $("calc-form").addEventListener("input", runCalculator);
+  $("calc-form").addEventListener("submit", (event) => event.preventDefault());
+  renderCalculatorForm();
+}
 
 renderCategoryOptions();
 render();

@@ -18,6 +18,8 @@
         <a class="nav-item" href="#" data-nav="insights">Insights</a>
         <a class="nav-item" href="#" data-nav="earnings">Earnings</a>
         <a class="nav-item" href="#" data-nav="saver">Saver</a>
+        <a class="nav-item" href="#" data-nav="subscriptions">Subscriptions</a>
+        <a class="nav-item" href="#" data-nav="tools">Calculators</a>
       </nav>
     </aside>
 
@@ -65,6 +67,11 @@
             <p>Remaining</p>
             <strong id="remaining-total">$0.00</strong>
             <span>Budget minus spending</span>
+          </article>
+          <article class="summary-card" id="safe-to-spend-card">
+            <p>Safe to spend today</p>
+            <strong id="safe-daily">$0.00</strong>
+            <span id="safe-note"></span>
           </article>
         </section>
 
@@ -123,6 +130,21 @@
           <div id="savings-goal-list" aria-live="polite"></div>
         </section>
 
+        <section class="panel" id="subscriptions-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Recurring costs</p>
+              <h2>Subscriptions</h2>
+            </div>
+            <button id="add-subscription-btn" class="secondary-btn" type="button">+ Add subscription</button>
+          </div>
+          <div class="sub-totals">
+            <p>Monthly cost <strong id="sub-monthly">$0.00</strong></p>
+            <p>Yearly cost <strong id="sub-yearly">$0.00</strong></p>
+          </div>
+          <ul class="bill-list" id="subscription-list" aria-live="polite"></ul>
+        </section>
+
         <div class="bottom-grid">
           <section class="panel spending-panel" id="spending-by-date">
             <div class="panel-head">
@@ -155,9 +177,17 @@
             </div>
           </div>
           <p id="personal-insight" class="insight-message" aria-live="polite"></p>
+          <div class="stat-grid" id="insight-stats" aria-live="polite"></div>
           <div class="charts-grid">
             <article>
-              <h3>Spending by category</h3>
+              <div class="chart-head">
+                <h3>Spending by category</h3>
+                <span class="segmented" role="group" aria-label="Chart style">
+                  <button type="button" class="seg-btn active" data-chart-mode="bars">Bars</button>
+                  <button type="button" class="seg-btn" data-chart-mode="pie">Pie</button>
+                </span>
+              </div>
+              <p class="chart-hint">Select a category to see its transactions.</p>
               <div id="category-chart" class="chart-list" aria-label="Spending by category"></div>
             </article>
             <article>
@@ -173,6 +203,22 @@
               <div id="comparison-insight" aria-live="polite"></div>
             </article>
           </div>
+        </section>
+
+        <section class="panel" id="tools-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Plan ahead</p>
+              <h2>Financial calculators</h2>
+            </div>
+            <label class="calc-picker">
+              <span class="sr-only">Choose a calculator</span>
+              <select id="calc-type"></select>
+            </label>
+          </div>
+          <p id="calc-help" class="insight-message"></p>
+          <form id="calc-form" class="calc-form" novalidate></form>
+          <div id="calc-result" class="calc-result" aria-live="polite"></div>
         </section>
 
         <section class="panel data-panel">
@@ -406,8 +452,37 @@
         <label class="modal-label"><span>Goal name</span><input id="goal-name" type="text" required /></label>
         <label class="modal-label"><span>Target amount</span><input id="goal-target" type="number" min="0.01" step="0.01" required /></label>
         <label class="modal-label"><span>Amount saved so far</span><input id="goal-saved" type="number" min="0" step="0.01" required /></label>
+        <label class="modal-label"><span>Target date (optional)</span><input id="goal-deadline" type="date" /></label>
         <div class="modal-actions">
           <button class="secondary-btn" type="button" data-close="goal-modal">Cancel</button>
+          <button class="primary-btn" type="submit">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="subscription-modal" role="dialog" aria-modal="true" aria-labelledby="subscription-modal-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="subscription-modal-title">Add subscription</h3>
+        <button class="close-btn" type="button" data-close="subscription-modal" aria-label="Close">×</button>
+      </div>
+      <form id="subscription-form" novalidate>
+        <div id="subscription-form-error" class="form-error" aria-live="polite"></div>
+        <input type="hidden" id="subscription-id" />
+        <label class="modal-label"><span>Name</span><input id="subscription-name" type="text" required /></label>
+        <label class="modal-label"><span>Cost</span><input id="subscription-amount" type="number" min="0.01" step="0.01" required /></label>
+        <label class="modal-label"><span>Billing cycle</span>
+          <select id="subscription-cycle">
+            <option value="monthly">Monthly</option>
+            <option value="yearly">Yearly</option>
+            <option value="fortnightly">Fortnightly</option>
+            <option value="weekly">Weekly</option>
+          </select>
+        </label>
+        <label class="modal-label"><span>Next renewal date</span><input id="subscription-date" type="date" required /></label>
+        <div class="modal-actions">
+          <button class="secondary-btn" type="button" data-close="subscription-modal">Cancel</button>
           <button class="primary-btn" type="submit">Save</button>
         </div>
       </form>
