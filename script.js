@@ -124,7 +124,7 @@ function renderRecentTransactions() {
 
   if (!list) return;
 
-  const recent = [...transactions]
+  const recent = [...getCurrentMonthTransactions()]
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 4);
 
