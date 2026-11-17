@@ -34,7 +34,7 @@ function formatMoney(value) {
     style: "currency",
     currency: "USD"
   }).format(value);
-  }
+}
 function getTotals() {
   const spent = transactions
     .filter(item => item.type === "expense")
@@ -59,6 +59,7 @@ function getTotals() {
     spent,
     remaining,
     income,
+    plannedReserve,
     billsAllocated,
     availableToPlan,
     flexibleSpending
@@ -71,9 +72,9 @@ function renderSummaryCards() {
     "budget-total": totals.budget,
     "spent-total": totals.spent,
     "remaining-total": totals.remaining,
-    "available-to-plan": totals.availableToPlan,
-    "bills-allocated": totals.billsAllocated,
-    "flexible-spending": totals.flexibleSpending
+    "available-to-plan": totals.flexibleSpending,
+    "planned-amount-total": totals.plannedReserve,
+    "bills-allocated": totals.billsAllocated
   };
 
   Object.entries(values).forEach(([id, value]) => {
@@ -163,10 +164,34 @@ function showTransactionFormError(message) {
   if (!errorEl) return;
   errorEl.textContent = message;
 }
+function renderBills() {
+  const list = document.getElementById("upcoming-bills-list");
+  if (!list) return;
+
+  list.replaceChildren();
+
+  plannedBills.filter(bill => !bill.paid).forEach(bill => {
+    const item = document.createElement("li");
+    const name = document.createElement("span");
+    const amount = document.createElement("strong");
+
+    name.textContent = bill.name;
+    amount.textContent = formatMoney(bill.amount);
+    item.append(name, amount);
+    list.appendChild(item);
+  });
+}
+
 function renderDashboard() {
   renderSummaryCards();
+  renderBills();
   renderRecentTransactions();
   renderSpendingByDate();
+
+  const note = document.getElementById("planned-note-display");
+  if (note) {
+    note.textContent = plannedBudget.note || "For savings or another goal.";
+  }
 }
 if (!transactions.length) {
   transactions = [
@@ -381,7 +406,7 @@ function groupExpensesByDate() {
 }
 
 function renderSpendingByDate() {
-  const container = document.getElementById("spending-by-date");
+  const container = document.getElementById("spending-by-date-list");
   if (!container) return;
 
   const groups = groupExpensesByDate();
