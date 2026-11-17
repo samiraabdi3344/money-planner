@@ -35,14 +35,39 @@ function formatMoney(value) {
     currency: "USD"
   }).format(value);
 }
-function getCurrentMonthTransactions() {
-  const today = new Date();
-  const month = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+let selectedMonth = new Date().toISOString().slice(0, 7);
 
+function getCurrentMonthTransactions() {
   return transactions.filter(item =>
-    item.date && item.date.startsWith(`${month}-`)
+    item.date && item.date.startsWith(`${selectedMonth}-`)
   );
 }
+
+function renderPeriodOptions() {
+  const select = document.getElementById("period-select");
+  if (!select) return;
+
+  const months = new Set(transactions.map(item => item.date.slice(0, 7)));
+  months.add(new Date().toISOString().slice(0, 7));
+  months.add(selectedMonth);
+
+  select.replaceChildren();
+  [...months].sort().reverse().forEach(month => {
+    const option = document.createElement("option");
+    option.value = month;
+    option.textContent = new Date(`${month}-01T00:00:00`).toLocaleDateString("en-GB", {
+      month: "long",
+      year: "numeric"
+    });
+    select.appendChild(option);
+  });
+  select.value = selectedMonth;
+}
+
+document.getElementById("period-select")?.addEventListener("change", (event) => {
+  selectedMonth = event.target.value;
+  renderDashboard();
+});
 function getTotals() {
     const monthlyTransactions = getCurrentMonthTransactions();
 
@@ -193,6 +218,7 @@ function renderBills() {
 }
 
 function renderDashboard() {
+  renderPeriodOptions();
   renderSummaryCards();
   renderBills();
   renderRecentTransactions();
