@@ -20,6 +20,7 @@
         <a class="nav-item" href="#" data-nav="saver">Saver</a>
         <a class="nav-item" href="#" data-nav="subscriptions">Subscriptions</a>
         <a class="nav-item" href="#" data-nav="tools">Calculators</a>
+        <a class="nav-item" href="#" data-nav="challenges">Challenges</a>
       </nav>
     </aside>
 
@@ -43,13 +44,15 @@
               <button id="period-next" class="secondary-btn" type="button" aria-label="Next period">›</button>
             </span>
           </label>
+          <button id="notify-btn" class="secondary-btn notify-btn" type="button" aria-label="Notifications">Alerts <span id="notify-count" class="badge" hidden>0</span></button>
+          <button id="customize-btn" class="secondary-btn" type="button">Customise</button>
           <button id="theme-toggle-btn" class="secondary-btn" type="button">Theme</button>
           <button id="add-transaction-btn" class="primary-btn" type="button">+ Add transaction</button>
         </div>
       </header>
 
       <section id="overview-view">
-        <section class="summary-grid" aria-label="Period summary">
+        <section class="summary-grid" data-section="summary" aria-label="Period summary">
           <article class="summary-card">
             <div class="summary-card-head">
               <p>Budget</p>
@@ -75,7 +78,7 @@
           </article>
         </section>
 
-        <section class="plan-grid" aria-label="Money plan">
+        <section class="plan-grid" data-section="plan" aria-label="Money plan">
           <article class="panel panel-highlight available-panel">
             <p class="eyebrow">Money left to assign</p>
             <h2>Available for planning + spending</h2>
@@ -108,18 +111,22 @@
           </article>
         </section>
 
-        <section class="panel" id="category-budgets">
+        <section class="panel" id="category-budgets" data-section="categories">
           <div class="panel-head">
             <div>
               <p class="eyebrow">Spending limits</p>
               <h2>Category budgets</h2>
             </div>
-            <button id="add-category-budget-btn" class="secondary-btn" type="button">+ Add category</button>
+            <div class="panel-buttons head-buttons">
+              <button id="templates-btn" class="secondary-btn" type="button">Budget templates</button>
+              <button id="manage-categories-btn" class="secondary-btn" type="button">Manage categories</button>
+              <button id="add-category-budget-btn" class="secondary-btn" type="button">+ Add category</button>
+            </div>
           </div>
           <div id="category-budget-list" aria-live="polite"></div>
         </section>
 
-        <section class="panel" id="savings-goals">
+        <section class="panel" id="savings-goals" data-section="goals">
           <div class="panel-head">
             <div>
               <p class="eyebrow">Your goals</p>
@@ -130,7 +137,7 @@
           <div id="savings-goal-list" aria-live="polite"></div>
         </section>
 
-        <section class="panel" id="subscriptions-panel">
+        <section class="panel" id="subscriptions-panel" data-section="subscriptions">
           <div class="panel-head">
             <div>
               <p class="eyebrow">Recurring costs</p>
@@ -145,7 +152,32 @@
           <ul class="bill-list" id="subscription-list" aria-live="polite"></ul>
         </section>
 
-        <div class="bottom-grid">
+        <section class="panel" id="challenges-panel" data-section="challenges">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Stay motivated</p>
+              <h2>Challenges and achievements</h2>
+            </div>
+          </div>
+          <p id="motivation" class="insight-message" aria-live="polite"></p>
+          <div class="stat-grid" id="challenge-stats" aria-live="polite"></div>
+          <div class="challenge-block">
+            <h3>Weekly money challenge</h3>
+            <p id="weekly-challenge" class="challenge-text"></p>
+            <button id="weekly-done-btn" class="secondary-btn" type="button"></button>
+          </div>
+          <div class="challenge-block">
+            <h3>52-week savings challenge</h3>
+            <p id="weeks52-summary" class="challenge-text"></p>
+            <div id="weeks52-grid" class="weeks-grid"></div>
+          </div>
+          <div class="challenge-block">
+            <h3>Achievements</h3>
+            <ul id="badge-list" class="badge-list"></ul>
+          </div>
+        </section>
+
+        <div class="bottom-grid" data-section="activity">
           <section class="panel spending-panel" id="spending-by-date">
             <div class="panel-head">
               <div>
@@ -169,7 +201,7 @@
           </section>
         </div>
 
-        <section class="panel insights-panel" id="insights-panel">
+        <section class="panel insights-panel" id="insights-panel" data-section="insights">
           <div class="panel-head">
             <div>
               <p class="eyebrow">Your money patterns</p>
@@ -205,7 +237,7 @@
           </div>
         </section>
 
-        <section class="panel" id="tools-panel">
+        <section class="panel" id="tools-panel" data-section="tools">
           <div class="panel-head">
             <div>
               <p class="eyebrow">Plan ahead</p>
@@ -221,16 +253,17 @@
           <div id="calc-result" class="calc-result" aria-live="polite"></div>
         </section>
 
-        <section class="panel data-panel">
+        <section class="panel data-panel" data-section="data">
           <div class="panel-head">
             <div>
               <p class="eyebrow">Your information</p>
               <h2>Backup and restore</h2>
             </div>
           </div>
-          <p>Export a backup of your transactions, budget, bills, goals, and settings.</p>
+          <p>Export a backup of your transactions, budget, bills, goals, and settings, or open your transactions in Excel with a CSV file.</p>
           <div class="panel-buttons">
             <button id="export-data-btn" class="secondary-btn" type="button">Download backup</button>
+            <button id="export-csv-btn" class="secondary-btn" type="button">Export transactions (CSV)</button>
             <label class="secondary-btn file-button">
               Restore backup
               <input id="import-data-input" type="file" accept="application/json,.json" />
@@ -486,6 +519,75 @@
           <button class="primary-btn" type="submit">Save</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="customize-modal" role="dialog" aria-modal="true" aria-labelledby="customize-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="customize-title">Customise dashboard</h3>
+        <button class="close-btn" type="button" data-close="customize-modal" aria-label="Close">×</button>
+      </div>
+      <p class="modal-help">Show, hide and reorder the sections on your overview.</p>
+      <ul id="customize-list" class="customize-list"></ul>
+      <div class="modal-actions">
+        <button class="secondary-btn" type="button" id="customize-reset">Reset</button>
+        <button class="primary-btn" type="button" data-close="customize-modal">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="categories-modal" role="dialog" aria-modal="true" aria-labelledby="categories-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="categories-title">Manage categories</h3>
+        <button class="close-btn" type="button" data-close="categories-modal" aria-label="Close">×</button>
+      </div>
+      <div id="categories-error" class="form-error" aria-live="polite"></div>
+      <form id="category-add-form" class="inline-form" novalidate>
+        <label class="sr-only" for="category-add-name">New category name</label>
+        <input id="category-add-name" type="text" placeholder="New category" />
+        <button class="primary-btn" type="submit">Add</button>
+      </form>
+      <ul id="categories-list" class="customize-list"></ul>
+      <p class="modal-help">Renaming updates your transactions and category budgets. Deleting moves transactions to "Other".</p>
+      <div class="modal-actions">
+        <button class="primary-btn" type="button" data-close="categories-modal">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="templates-modal" role="dialog" aria-modal="true" aria-labelledby="templates-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="templates-title">Budget templates</h3>
+        <button class="close-btn" type="button" data-close="templates-modal" aria-label="Close">×</button>
+      </div>
+      <div id="template-error" class="form-error" aria-live="polite"></div>
+      <label class="modal-label"><span>Template</span><select id="template-type"></select></label>
+      <p id="template-help" class="modal-help"></p>
+      <label class="modal-label"><span>Monthly income</span><input id="template-income" type="number" min="0.01" step="0.01" value="2000" /></label>
+      <ul id="template-preview" class="mini-list template-preview"></ul>
+      <p class="modal-help">Applying sets your monthly budget, replaces your category budgets and adds a savings allocation.</p>
+      <div class="modal-actions">
+        <button class="secondary-btn" type="button" data-close="templates-modal">Cancel</button>
+        <button class="primary-btn" type="button" id="template-apply">Apply template</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="notify-modal" role="dialog" aria-modal="true" aria-labelledby="notify-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="notify-title">Notifications</h3>
+        <button class="close-btn" type="button" data-close="notify-modal" aria-label="Close">×</button>
+      </div>
+      <ul id="notify-list" class="notify-list" aria-live="polite"></ul>
+      <h4>Notification preferences</h4>
+      <div id="notify-prefs" class="pref-list"></div>
+      <div class="modal-actions">
+        <button class="primary-btn" type="button" data-close="notify-modal">Close</button>
+      </div>
     </div>
   </div>
 

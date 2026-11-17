@@ -10,6 +10,10 @@ const KEYS = {
   categoryBudgets: "money-dashboard-category-budgets",
   goals: "money-dashboard-goals",
   subscriptions: "money-dashboard-subscriptions",
+  layout: "money-dashboard-layout",
+  challenges: "money-dashboard-challenges",
+  notifyPrefs: "money-dashboard-notify-prefs",
+  lastBackup: "money-dashboard-last-backup",
   period: "money-dashboard-period",
   seeded: "money-dashboard-seeded",
   theme: "money-dashboard-theme"
@@ -121,6 +125,9 @@ let categoryBudgets = load(KEYS.categoryBudgets, []);
 let goals = load(KEYS.goals, []);
 let subscriptions = load(KEYS.subscriptions, []);
 let chartMode = "bars";
+let challenges = load(KEYS.challenges, {});
+let layout = load(KEYS.layout, {});
+let notifyPrefs = load(KEYS.notifyPrefs, {});
 let monthlyBudget = validAmount(load(KEYS.budget, DEFAULT_BUDGET), true) ?? DEFAULT_BUDGET;
 let periodType = load(KEYS.period, "month");
 if (!FACTORS[periodType]) periodType = "month";
@@ -137,6 +144,12 @@ if (!Array.isArray(categories)) categories = [];
 if (!Array.isArray(categoryBudgets)) categoryBudgets = [];
 if (!Array.isArray(goals)) goals = [];
 if (!Array.isArray(subscriptions)) subscriptions = [];
+for (const key of ["challenges", "layout", "notifyPrefs"]) {
+  const value = { challenges, layout, notifyPrefs }[key];
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    if (key === "challenges") challenges = {}; else if (key === "layout") layout = {}; else notifyPrefs = {};
+  }
+}
 
 if (localStorage.getItem(KEYS.seeded) === null) {
   if (!transactions.length) {
@@ -585,6 +598,8 @@ function render() {
   renderSubscriptions();
   renderInsights();
   renderHistory();
+  renderChallenges();
+  renderNotifications();
 }
 
 /* Modal helpers */
@@ -874,6 +889,7 @@ function view(name) {
   if (name === "saver") $("savings-goals").scrollIntoView({ behavior: "smooth" });
   if (name === "subscriptions") $("subscriptions-panel").scrollIntoView({ behavior: "smooth" });
   if (name === "tools") $("tools-panel").scrollIntoView({ behavior: "smooth" });
+  if (name === "challenges") $("challenges-panel").scrollIntoView({ behavior: "smooth" });
   document.querySelectorAll(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.nav === name));
   renderHistory();
 }
@@ -894,7 +910,8 @@ $("period-next")?.addEventListener("click", () => stepPeriod(1));
 $("export-data-btn")?.addEventListener("click", () => {
   const backup = {
     version: 1, exportedAt: new Date().toISOString(), transactions, bills, allocations,
-    monthlyBudget, categories, categoryBudgets, goals, subscriptions, theme: localStorage.getItem(KEYS.theme)
+    monthlyBudget, categories, categoryBudgets, goals, subscriptions, challenges, layout, notifyPrefs,
+    theme: localStorage.getItem(KEYS.theme)
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -903,7 +920,9 @@ $("export-data-btn")?.addEventListener("click", () => {
   link.download = `money-dashboard-backup-${today()}.json`;
   link.click();
   URL.revokeObjectURL(url);
+  localStorage.setItem(KEYS.lastBackup, new Date().toISOString());
   showMessage("backup-message", "Backup downloaded.");
+  render();
 });
 $("import-data-input")?.addEventListener("change", async (event) => {
   const file = event.target.files?.[0];
@@ -922,6 +941,11 @@ $("import-data-input")?.addEventListener("change", async (event) => {
     goals = Array.isArray(data.goals) ? data.goals : [];
     subscriptions = Array.isArray(data.subscriptions) ? data.subscriptions.map(cleanSubscription).filter(Boolean) : [];
     monthlyBudget = validAmount(data.monthlyBudget, true) ?? DEFAULT_BUDGET;
+    challenges = data.challenges && typeof data.challenges === "object" ? data.challenges : {};
+    layout = data.layout && typeof data.layout === "object" ? data.layout : {};
+    notifyPrefs = data.notifyPrefs && typeof data.notifyPrefs === "object" ? data.notifyPrefs : {};
+    save(KEYS.challenges, challenges); save(KEYS.layout, layout); save(KEYS.notifyPrefs, notifyPrefs);
+    applyLayout();
     saveTransactions(); saveBills(); savePlan();
     save(KEYS.categories, categories); save(KEYS.categoryBudgets, categoryBudgets);
     save(KEYS.goals, goals); save(KEYS.subscriptions, subscriptions); save(KEYS.budget, monthlyBudget);
@@ -1149,6 +1173,412 @@ if ($("calc-type")) {
   $("calc-form").addEventListener("submit", (event) => event.preventDefault());
   renderCalculatorForm();
 }
+
+/* Dashboard customisation */
+const SECTIONS = [
+  ["summary", "Summary cards"], ["plan", "Money plan and bills"], ["categories", "Category budgets"],
+  ["goals", "Savings goals"], ["subscriptions", "Subscriptions"], ["challenges", "Challenges and achievements"],
+  ["activity", "Spending and recent transactions"], ["insights", "Insights"], ["tools", "Calculators"],
+  ["data", "Backup and export"]
+];
+function layoutState() {
+  const ids = SECTIONS.map(([id]) => id);
+  const order = (Array.isArray(layout.order) ? layout.order : []).filter((id) => ids.includes(id));
+  ids.forEach((id) => { if (!order.includes(id)) order.push(id); });
+  const hidden = (Array.isArray(layout.hidden) ? layout.hidden : []).filter((id) => ids.includes(id));
+  return { order, hidden };
+}
+function applyLayout() {
+  const { order, hidden } = layoutState();
+  document.querySelectorAll("[data-section]").forEach((node) => {
+    node.hidden = hidden.includes(node.dataset.section);
+    node.style.order = order.indexOf(node.dataset.section);
+  });
+}
+function renderCustomize() {
+  const { order, hidden } = layoutState();
+  const names = Object.fromEntries(SECTIONS);
+  $("customize-list").innerHTML = order.map((id, i) => `<li>
+    <label><input type="checkbox" data-section-toggle="${id}" ${hidden.includes(id) ? "" : "checked"} /> ${esc(names[id])}</label>
+    <span class="transaction-actions">
+      <button class="mini-btn" type="button" data-section-move="-1" data-id="${id}" ${i === 0 ? "disabled" : ""} aria-label="Move ${esc(names[id])} up">Up</button>
+      <button class="mini-btn" type="button" data-section-move="1" data-id="${id}" ${i === order.length - 1 ? "disabled" : ""} aria-label="Move ${esc(names[id])} down">Down</button>
+    </span></li>`).join("");
+}
+function saveLayout(next) {
+  layout = next;
+  save(KEYS.layout, layout);
+  applyLayout();
+  renderCustomize();
+}
+$("customize-btn")?.addEventListener("click", () => { renderCustomize(); openModal("customize-modal"); });
+$("customize-reset")?.addEventListener("click", () => saveLayout({}));
+$("customize-list")?.addEventListener("change", (event) => {
+  const id = event.target.dataset.sectionToggle;
+  if (!id) return;
+  const { order, hidden } = layoutState();
+  saveLayout({ order, hidden: event.target.checked ? hidden.filter((x) => x !== id) : [...hidden, id] });
+});
+$("customize-list")?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-section-move]");
+  if (!button) return;
+  const { order, hidden } = layoutState();
+  const from = order.indexOf(button.dataset.id);
+  const to = from + Number(button.dataset.sectionMove);
+  if (to < 0 || to >= order.length) return;
+  order.splice(to, 0, order.splice(from, 1)[0]);
+  saveLayout({ order, hidden });
+});
+applyLayout();
+
+/* Custom categories: add, rename, delete */
+function syncCategories() {
+  transactions.forEach((t) => {
+    if (!categories.some((c) => c.toLowerCase() === t.category.toLowerCase())) categories.push(t.category);
+  });
+  if (!categories.includes("Other")) categories.push("Other");
+  categories.sort((a, b) => a.localeCompare(b));
+  save(KEYS.categories, categories);
+}
+function renderCategoryManager() {
+  $("categories-list").innerHTML = categories.map((name) => {
+    const count = transactions.filter((t) => t.category === name).length;
+    const locked = name === "Other";
+    return `<li><span>${esc(name)} <small>${count} transaction${count === 1 ? "" : "s"}</small></span>
+      <span class="transaction-actions">
+        ${locked ? `<small>Default</small>` : `<button class="mini-btn rename-category" data-name="${esc(name)}" type="button">Rename</button>
+        <button class="mini-btn delete-category" data-name="${esc(name)}" type="button">Delete</button>`}
+      </span></li>`;
+  }).join("");
+}
+function mergeCategoryBudgets() {
+  const merged = [];
+  categoryBudgets.forEach((b) => {
+    const same = merged.find((m) => m.category.toLowerCase() === b.category.toLowerCase());
+    if (same) same.limit = Number(same.limit) + Number(b.limit);
+    else merged.push({ ...b });
+  });
+  categoryBudgets = merged;
+}
+function renameCategory(oldName) {
+  const input = prompt(`Rename "${oldName}" to:`, oldName);
+  const name = String(input ?? "").trim();
+  if (!name || name === oldName) return;
+  const clash = categories.find((c) => c.toLowerCase() === name.toLowerCase() && c !== oldName);
+  const finalName = clash || name;
+  transactions = transactions.map((t) => t.category === oldName ? { ...t, category: finalName } : t);
+  categoryBudgets = categoryBudgets.map((b) => b.category.toLowerCase() === oldName.toLowerCase() ? { ...b, category: finalName } : b);
+  mergeCategoryBudgets();
+  categories = [...new Set(categories.map((c) => c === oldName ? finalName : c))].sort((a, b) => a.localeCompare(b));
+  save(KEYS.categories, categories); save(KEYS.categoryBudgets, categoryBudgets); saveTransactions();
+  renderCategoryManager();
+  render();
+}
+function deleteCategory(name) {
+  const count = transactions.filter((t) => t.category === name).length;
+  if (!confirm(`Delete "${name}"? ${count} transaction${count === 1 ? "" : "s"} will move to "Other" and its budget will be removed.`)) return;
+  transactions = transactions.map((t) => t.category === name ? { ...t, category: "Other" } : t);
+  categoryBudgets = categoryBudgets.filter((b) => b.category.toLowerCase() !== name.toLowerCase());
+  categories = categories.filter((c) => c !== name);
+  save(KEYS.categories, categories); save(KEYS.categoryBudgets, categoryBudgets); saveTransactions();
+  renderCategoryManager();
+  render();
+}
+$("manage-categories-btn")?.addEventListener("click", () => {
+  syncCategories();
+  formError("categories-error", "");
+  renderCategoryManager();
+  openModal("categories-modal");
+});
+$("category-add-form")?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const name = $("category-add-name").value.trim();
+  if (!name) return formError("categories-error", "Enter a category name.");
+  if (categories.some((c) => c.toLowerCase() === name.toLowerCase())) return formError("categories-error", "That category already exists.");
+  formError("categories-error", "");
+  rememberCategory(name);
+  $("category-add-name").value = "";
+  renderCategoryManager();
+});
+$("categories-list")?.addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (!button) return;
+  if (button.matches(".rename-category")) renameCategory(button.dataset.name);
+  else if (button.matches(".delete-category")) deleteCategory(button.dataset.name);
+});
+
+/* Budget templates */
+const TEMPLATES = {
+  student: { name: "Student", help: "Rent, study costs and a small savings habit.",
+    lines: [["Rent", 35], ["Groceries", 15], ["Transport", 10], ["Study & textbooks", 8], ["Eating out", 7], ["Phone & internet", 5], ["Other", 5]], savings: [["Savings", 15]] },
+  worker: { name: "Worker", help: "A balanced plan for a regular wage.",
+    lines: [["Rent", 30], ["Groceries", 12], ["Transport", 10], ["Bills", 10], ["Eating out", 8], ["Entertainment", 5], ["Other", 5]], savings: [["Savings", 20]] },
+  family: { name: "Family", help: "More for groceries, bills and children.",
+    lines: [["Rent", 32], ["Groceries", 18], ["Transport", 10], ["Bills", 12], ["Childcare & school", 10], ["Eating out", 4], ["Other", 4]], savings: [["Savings", 10]] },
+  fifty: { name: "50/30/20 method", help: "50% needs, 30% wants, 20% savings.",
+    lines: [["Rent", 25], ["Groceries", 12], ["Transport", 8], ["Bills", 5], ["Eating out", 10], ["Entertainment", 10], ["Other", 10]], savings: [["Savings", 20]] },
+  zero: { name: "Zero-based budget", help: "Every dollar of income is given a job.",
+    lines: [["Rent", 30], ["Groceries", 15], ["Transport", 10], ["Bills", 10], ["Eating out", 8], ["Entertainment", 5], ["Other", 7]], savings: [["Savings", 10], ["Emergency fund", 5]] },
+  envelope: { name: "Envelope budget", help: "Fixed spending envelopes for each category.",
+    lines: [["Rent", 30], ["Groceries", 15], ["Transport", 10], ["Bills", 10], ["Eating out", 10], ["Entertainment", 10], ["Other", 5]], savings: [["Savings", 10]] }
+};
+function templatePlan() {
+  const template = TEMPLATES[$("template-type").value];
+  const income = validAmount($("template-income").value);
+  if (!template || !income) return null;
+  const amount = (pct) => Math.round(income * pct) / 100;
+  return {
+    template, income,
+    limits: template.lines.map(([category, pct]) => ({ category, limit: amount(pct), pct })),
+    savings: template.savings.map(([name, pct]) => ({ name, amount: amount(pct), pct }))
+  };
+}
+function renderTemplatePreview() {
+  const plan = templatePlan();
+  $("template-help").textContent = TEMPLATES[$("template-type").value]?.help || "";
+  $("template-preview").innerHTML = plan
+    ? [...plan.limits.map((l) => `<li>${esc(l.category)} <span>${money(l.limit)} · ${l.pct}%</span></li>`),
+       ...plan.savings.map((a) => `<li>${esc(a.name)} (saved) <span>${money(a.amount)} · ${a.pct}%</span></li>`)].join("")
+    : `<li class="empty-state">Enter your monthly income to see the plan.</li>`;
+}
+if ($("template-type")) {
+  $("template-type").innerHTML = Object.entries(TEMPLATES).map(([id, t]) => `<option value="${id}">${esc(t.name)}</option>`).join("");
+  $("template-type").addEventListener("change", renderTemplatePreview);
+  $("template-income").addEventListener("input", renderTemplatePreview);
+}
+$("templates-btn")?.addEventListener("click", () => {
+  formError("template-error", "");
+  renderTemplatePreview();
+  openModal("templates-modal");
+});
+$("template-apply")?.addEventListener("click", () => {
+  const plan = templatePlan();
+  if (!plan) return formError("template-error", "Enter a monthly income above zero.");
+  if (!confirm(`Apply the ${plan.template.name} template? Your monthly budget becomes ${money(plan.income)} and your category budgets will be replaced.`)) return;
+  monthlyBudget = plan.income;
+  save(KEYS.budget, monthlyBudget);
+  categoryBudgets = plan.limits.map((l) => ({ id: uid(), category: l.category, limit: l.limit }));
+  plan.limits.forEach((l) => rememberCategory(l.category));
+  save(KEYS.categoryBudgets, categoryBudgets);
+  allocations = allocations.filter((a) => !a.template);
+  plan.savings.forEach((a) => allocations.push({ id: uid(), name: a.name, type: "savings", amount: a.amount, template: true }));
+  savePlan();
+  render();
+  closeModal("templates-modal");
+});
+
+/* CSV export */
+function csvCell(value) {
+  let text = String(value ?? "");
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+$("export-csv-btn")?.addEventListener("click", () => {
+  const rows = [["Date", "Type", "Description", "Category", "Amount", "Notes"]]
+    .concat(transactions.slice().sort((a, b) => a.date.localeCompare(b.date))
+      .map((t) => [t.date, t.type, t.description, t.category, t.amount.toFixed(2), t.notes]));
+  const csv = "\uFEFF" + rows.map((r) => r.map(csvCell).join(",")).join("\r\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `money-dashboard-transactions-${today()}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+  showMessage("backup-message", `Exported ${transactions.length} transaction${transactions.length === 1 ? "" : "s"} to CSV.`);
+});
+
+/* Reminders and notification centre */
+const NOTIFY_TYPES = [
+  ["bills", "Bill reminders and overdue bills"], ["subscriptions", "Subscription renewals"],
+  ["budgets", "Budget limit warnings"], ["goals", "Savings goal deadlines"],
+  ["backup", "Backup reminders"], ["summary", "Weekly summary"]
+];
+function notifyOn(type) { return notifyPrefs[type] !== false; }
+function buildNotifications() {
+  const list = [];
+  const now = today();
+  if (notifyOn("bills")) {
+    billOccurrences({ start: addDays(now, -31), end: addDays(now, 3) }).filter((b) => !b.paid).forEach(({ bill, date }) => {
+      if (date < now) list.push({ level: "warn", text: `${bill.name} (${money(bill.amount)}) was due ${formatDate(date, { day: "numeric", month: "short" })} and is unpaid.` });
+      else list.push({ level: "info", text: `${bill.name} (${money(bill.amount)}) is due ${date === now ? "today" : formatDate(date, { day: "numeric", month: "short" })}.` });
+    });
+  }
+  if (notifyOn("subscriptions")) {
+    subscriptions.forEach((sub) => {
+      const next = nextRenewal(sub);
+      const days = daysBetween(now, next);
+      if (days <= 7) list.push({ level: "info", text: `${sub.name} renews ${days === 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`} (${money(sub.amount)}).` });
+    });
+  }
+  if (notifyOn("budgets")) {
+    const month = periodRange("month", now);
+    const expenses = rangeTransactions(month).filter((t) => t.type === "expense");
+    categoryBudgets.forEach((b) => {
+      const spent = expenses.filter((t) => t.category.toLowerCase() === b.category.toLowerCase()).reduce((sum, t) => sum + t.amount, 0);
+      const limit = Number(b.limit);
+      if (spent >= limit) list.push({ level: "warn", text: `${b.category} is over its monthly limit (${money(spent)} of ${money(limit)}).` });
+      else if (spent >= limit * 0.8) list.push({ level: "info", text: `${b.category} has used ${Math.round(spent / limit * 100)}% of its monthly limit.` });
+    });
+    const total = expenses.reduce((sum, t) => sum + t.amount, 0);
+    if (monthlyBudget > 0 && total >= monthlyBudget) list.push({ level: "warn", text: `You have spent your whole monthly budget (${money(total)} of ${money(monthlyBudget)}).` });
+    else if (monthlyBudget > 0 && total >= monthlyBudget * 0.9) list.push({ level: "info", text: `You have used ${Math.round(total / monthlyBudget * 100)}% of your monthly budget.` });
+  }
+  if (notifyOn("goals")) {
+    goals.forEach((goal) => {
+      if (!goal.deadline || goal.saved >= goal.target) return;
+      const days = daysBetween(now, goal.deadline);
+      if (days < 0) list.push({ level: "warn", text: `The target date for "${goal.name}" has passed.` });
+      else if (days <= 30) list.push({ level: "info", text: `"${goal.name}" is due in ${days} day${days === 1 ? "" : "s"} and you still need ${money(goal.target - goal.saved)}.` });
+    });
+  }
+  if (notifyOn("backup")) {
+    const last = localStorage.getItem(KEYS.lastBackup);
+    const age = last ? Math.floor((Date.now() - Date.parse(last)) / 86400000) : null;
+    if (age === null) list.push({ level: "info", text: "You have not downloaded a backup yet. Your data only lives in this browser." });
+    else if (age >= 30) list.push({ level: "info", text: `Your last backup was ${age} days ago.` });
+  }
+  if (notifyOn("summary")) {
+    const week = periodRange("week", now);
+    const prev = periodRange("week", addDays(week.start, -7));
+    const sum = (range) => rangeTransactions(range).filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+    list.push({ level: "summary", text: `This week you have spent ${money(sum(week))}. Last week: ${money(sum(prev))}.` });
+  }
+  return list;
+}
+function renderNotifications() {
+  const list = buildNotifications();
+  const alerts = list.filter((n) => n.level !== "summary").length;
+  const badge = $("notify-count");
+  if (badge) { badge.textContent = alerts; badge.hidden = alerts === 0; }
+  if ($("notify-btn")) $("notify-btn").setAttribute("aria-label", `Notifications, ${alerts} new`);
+  if ($("notify-list")) $("notify-list").innerHTML = list.length
+    ? list.map((n) => `<li class="notify-${n.level}">${esc(n.text)}</li>`).join("")
+    : `<li class="empty-state">You are all caught up.</li>`;
+  if ($("notify-prefs")) $("notify-prefs").innerHTML = NOTIFY_TYPES.map(([id, label]) =>
+    `<label><input type="checkbox" data-notify="${id}" ${notifyOn(id) ? "checked" : ""} /> ${esc(label)}</label>`).join("");
+}
+$("notify-btn")?.addEventListener("click", () => { renderNotifications(); openModal("notify-modal"); });
+$("notify-prefs")?.addEventListener("change", (event) => {
+  const id = event.target.dataset.notify;
+  if (!id) return;
+  notifyPrefs = { ...notifyPrefs, [id]: event.target.checked };
+  save(KEYS.notifyPrefs, notifyPrefs);
+  renderNotifications();
+});
+
+/* Challenges, streaks and achievements */
+const WEEKLY_CHALLENGES = [
+  "Make coffee or lunch at home for five days.",
+  "Spend nothing on eating out this week.",
+  "Find one subscription you can pause or cancel.",
+  "Move $10 into a savings goal.",
+  "Skip one impulse purchase and note what you saved.",
+  "Review last week's transactions and fix any wrong categories.",
+  "Try a no-spend weekend.",
+  "Sell or donate one thing you no longer use.",
+  "Plan your meals before you shop.",
+  "Save the loose change from every purchase.",
+  "Compare your phone or internet plan with another provider.",
+  "Write down one money goal for next month."
+];
+function weekIndex(weekStart) {
+  return Math.floor(daysBetween("2024-01-01", weekStart) / 7);
+}
+function saveChallenges() { save(KEYS.challenges, challenges); }
+function loggingStreaks() {
+  const dates = [...new Set(transactions.map((t) => t.date).filter((d) => d <= today()))].sort();
+  let best = 0, run = 0, prev = null;
+  dates.forEach((d) => {
+    run = prev && daysBetween(prev, d) === 1 ? run + 1 : 1;
+    best = Math.max(best, run);
+    prev = d;
+  });
+  const set = new Set(dates);
+  let day = set.has(today()) ? today() : addDays(today(), -1);
+  let current = 0;
+  while (set.has(day)) { current++; day = addDays(day, -1); }
+  return { current, best };
+}
+function noSpendStats() {
+  const now = today();
+  const start = `${now.slice(0, 7)}-01`;
+  const first = transactions.length ? transactions.map((t) => t.date).sort()[0] : now;
+  const spendDays = new Set(transactions.filter((t) => t.type === "expense").map((t) => t.date));
+  let days = 0, streak = 0;
+  for (let d = start > first ? start : first; d <= now; d = addDays(d, 1)) {
+    if (!spendDays.has(d)) { days++; streak++; } else streak = 0;
+  }
+  return { days, streak };
+}
+function renderChallenges() {
+  const stats = $("challenge-stats");
+  if (!stats) return;
+  const now = today();
+  const week = periodRange("week", now).start;
+  const done = Array.isArray(challenges.weeklyDone) ? challenges.weeklyDone : [];
+  const weeks = Array.isArray(challenges.weeks52) ? challenges.weeks52 : [];
+  const logging = loggingStreaks();
+  const noSpend = noSpendStats();
+  const savedTotal = weeks.reduce((sum, n) => sum + n, 0);
+
+  stats.innerHTML = [
+    ["Recording streak", `${logging.current} day${logging.current === 1 ? "" : "s"}`],
+    ["Best streak", `${logging.best} day${logging.best === 1 ? "" : "s"}`],
+    ["No-spend days this month", `${noSpend.days} (current run ${noSpend.streak})`],
+    ["52-week total", money(savedTotal)],
+    ["Weekly challenges done", String(done.length)]
+  ].map(([label, value]) => `<div class="stat"><span>${label}</span><strong>${esc(value)}</strong></div>`).join("");
+
+  const isDone = done.includes(week);
+  $("weekly-challenge").textContent = WEEKLY_CHALLENGES[weekIndex(week) % WEEKLY_CHALLENGES.length];
+  $("weekly-done-btn").textContent = isDone ? "Done this week - undo" : "Mark as done";
+  $("weekly-done-btn").classList.toggle("primary-btn", !isDone);
+  $("weekly-done-btn").classList.toggle("secondary-btn", isDone);
+
+  const next = Array.from({ length: 52 }, (_, i) => i + 1).find((n) => !weeks.includes(n));
+  $("weeks52-summary").textContent = weeks.length === 52
+    ? `Challenge complete - you saved ${money(savedTotal)}!`
+    : `Save the week number in dollars (week 1 = $1 ... week 52 = $52). Saved so far: ${money(savedTotal)}. Next up: ${money(next)}.`;
+  $("weeks52-grid").innerHTML = Array.from({ length: 52 }, (_, i) => i + 1).map((n) =>
+    `<button type="button" class="week-btn ${weeks.includes(n) ? "done" : ""}" data-week="${n}" aria-pressed="${weeks.includes(n)}" aria-label="Week ${n}, ${money(n)}">${n}</button>`).join("");
+
+  const month = periodRange("month", now);
+  const monthSpent = rangeTransactions(month).filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+  const badges = [
+    ["First step", "Record your first transaction", transactions.length > 0],
+    ["On a roll", "Record transactions 7 days in a row", logging.best >= 7],
+    ["Within budget", "Spend less than your budget this month", monthlyBudget > 0 && monthSpent > 0 && monthSpent <= monthlyBudget],
+    ["Goal getter", "Reach a savings goal", goals.some((g) => g.saved >= g.target)],
+    ["Saver", "Save $100 across your goals", goals.reduce((s, g) => s + g.saved, 0) >= 100],
+    ["Subscription spotter", "Track a subscription", subscriptions.length > 0],
+    ["No-spend star", "Have 3 no-spend days this month", noSpend.days >= 3],
+    ["Challenger", "Complete a weekly or 52-week challenge", done.length > 0 || weeks.length > 0]
+  ];
+  $("badge-list").innerHTML = badges.map(([name, text, earned]) =>
+    `<li class="${earned ? "earned" : ""}"><strong>${esc(name)}</strong><span>${esc(text)}</span><small>${earned ? "Earned" : "Locked"}</small></li>`).join("");
+
+  const reached = goals.find((g) => g.saved >= g.target);
+  $("motivation").textContent = reached ? `You reached "${reached.name}" - amazing work!`
+    : logging.current >= 3 ? `${logging.current} days in a row of recording your money. Keep it up!`
+    : monthSpent > 0 && monthSpent <= monthlyBudget ? "You are within budget this month. Nice work."
+    : "Small steps add up. Try this week's challenge.";
+}
+$("weekly-done-btn")?.addEventListener("click", () => {
+  const week = periodRange("week", today()).start;
+  const done = Array.isArray(challenges.weeklyDone) ? challenges.weeklyDone : [];
+  challenges = { ...challenges, weeklyDone: done.includes(week) ? done.filter((w) => w !== week) : [...done, week] };
+  saveChallenges();
+  renderChallenges();
+});
+$("weeks52-grid")?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-week]");
+  if (!button) return;
+  const n = Number(button.dataset.week);
+  const weeks = Array.isArray(challenges.weeks52) ? challenges.weeks52 : [];
+  challenges = { ...challenges, weeks52: weeks.includes(n) ? weeks.filter((x) => x !== n) : [...weeks, n] };
+  saveChallenges();
+  renderChallenges();
+});
 
 renderCategoryOptions();
 render();
