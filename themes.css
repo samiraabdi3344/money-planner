@@ -290,3 +290,113 @@ body.theme-berry-light .summary-card {
     color-mix(in srgb, var(--panel) 78%, var(--illustration-b))
   ) !important;
 }
+/* Motion and depth use each theme's existing illustration colors. */
+body {
+  transition: background-color 450ms ease, color 350ms ease;
+}
+
+body::before {
+  transform-origin: center;
+  animation: theme-glow-drift 32s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+body::after {
+  position: fixed;
+  z-index: 0;
+  inset: -12%;
+  background:
+    radial-gradient(ellipse at 32% 42%, var(--illustration-b, transparent), transparent 34%),
+    radial-gradient(ellipse at 68% 66%, var(--illustration-a, transparent), transparent 38%);
+  content: "";
+  opacity: 0.32;
+  pointer-events: none;
+  animation: theme-glow-breathe 24s ease-in-out infinite alternate;
+  will-change: transform, opacity;
+}
+
+.summary-card,
+.panel {
+  animation: theme-card-enter 550ms cubic-bezier(0.2, 0.7, 0.25, 1) both;
+  transition:
+    transform 220ms ease,
+    box-shadow 280ms ease,
+    border-color 220ms ease,
+    background-color 350ms ease;
+}
+
+.summary-grid .summary-card:nth-child(2) { animation-delay: 50ms; }
+.summary-grid .summary-card:nth-child(3) { animation-delay: 100ms; }
+.summary-grid .summary-card:nth-child(4) { animation-delay: 150ms; }
+
+.panel:hover,
+.summary-card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--purple) 30%, var(--border));
+  box-shadow:
+    var(--shadow),
+    0 14px 28px color-mix(in srgb, var(--purple) 12%, transparent);
+}
+
+.panel:focus-within,
+.summary-card:focus-within {
+  border-color: color-mix(in srgb, var(--purple) 42%, var(--border));
+}
+
+.nav-item,
+.primary-btn,
+.secondary-btn,
+.mini-btn,
+.week-btn {
+  transition:
+    color 220ms ease,
+    background-color 220ms ease,
+    border-color 220ms ease,
+    box-shadow 220ms ease,
+    transform 180ms ease;
+}
+
+.primary-btn:active,
+.secondary-btn:active,
+.mini-btn:active,
+.week-btn:active {
+  transform: scale(0.98);
+}
+
+.theme-grid .theme-option {
+  animation: theme-option-enter 420ms ease both;
+}
+
+.theme-grid .theme-option:nth-child(2n) { animation-delay: 45ms; }
+.theme-grid .theme-option:nth-child(3n) { animation-delay: 90ms; }
+
+@keyframes theme-glow-drift {
+  from { transform: scale(1) translate3d(-0.5%, 0, 0); }
+  to { transform: scale(1.08) translate3d(0.5%, -0.5%, 0); }
+}
+
+@keyframes theme-glow-breathe {
+  from { transform: translate3d(-1%, 0.5%, 0) scale(0.98); opacity: 0.22; }
+  to { transform: translate3d(1%, -0.5%, 0) scale(1.04); opacity: 0.38; }
+}
+
+@keyframes theme-card-enter {
+  from { opacity: 0; filter: blur(2px); }
+  to { opacity: 1; filter: blur(0); }
+}
+
+@keyframes theme-option-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
