@@ -760,3 +760,42 @@ button.chart-link:focus-visible { background: color-mix(in srgb, var(--purple) 9
   .head-buttons { justify-content: flex-start; }
   .panel-head { flex-wrap: wrap; }
 }
+/* Phase 3: debts, forecast, report and install */
+.check-label { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; color: var(--muted); font-size: 0.84rem; }
+.debt-plan { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 14px; margin-top: 10px; }
+.debt-plan .modal-label { margin-bottom: 8px; }
+.debt-list { display: grid; gap: 12px; margin-top: 10px; }
+.debt-card progress::-webkit-progress-value { background: #3f8fb5; }
+.debt-card progress::-moz-progress-bar { background: #3f8fb5; }
+.pill { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: var(--panel-strong); color: var(--text); font-size: 0.68rem; font-weight: 700; vertical-align: middle; }
+.forecast-month { display: grid; gap: 4px; margin-bottom: 8px; }
+.forecast-month p { margin: 0; }
+.forecast-over { color: #b42318; font-weight: 650; }
+.forecast-ok { color: #2f7d57; font-weight: 650; }
+.forecast-title { margin: 14px 0 2px; font-size: 1rem; }
+.forecast-list { margin: 0; padding: 0; list-style: none; }
+.forecast-list li { display: grid; grid-template-columns: 90px 1fr 110px; align-items: center; gap: 12px; padding: 7px 0; border-top: 1px solid var(--border); }
+.forecast-list strong { text-align: right; font-size: 0.9rem; }
+.forecast-track { display: block; height: 10px; overflow: hidden; border-radius: 999px; background: var(--border); }
+.forecast-fill { display: block; height: 100%; border-radius: inherit; background: #4a9b70; transition: width 400ms ease; }
+.forecast-fill.negative { background: #c44747; }
+.report-card { width: min(720px, 100%); max-height: 92vh; }
+.report-body h2 { margin: 0; }
+.report-body h3 { margin: 18px 0 6px; font-size: 1rem; }
+.report-sub { margin: 2px 0 12px; color: var(--muted); font-size: 0.8rem; }
+.report-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
+.report-stats p { margin: 0; padding: 10px; border: 1px solid var(--border); border-radius: 12px; color: var(--muted); font-size: 0.78rem; }
+.report-stats strong { display: block; margin-top: 3px; color: var(--text); font-size: 1.05rem; }
+.report-body table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.report-body th, .report-body td { padding: 6px 4px; border-bottom: 1px solid var(--border); text-align: left; }
+.report-body .num { text-align: right; }
+@media (max-width: 560px) { .forecast-list li { grid-template-columns: 70px 1fr 90px; gap: 8px; } }
+@media print {
+  body.printing-report .app-shell, body.printing-report .modal:not(#report-modal), body.printing-report .no-print { display: none !important; }
+  body.printing-report::before, body.printing-report::after { display: none !important; }
+  body.printing-report, body.printing-report #report-modal { background: #fff !important; }
+  body.printing-report #report-modal { position: static; display: block; padding: 0; overflow: visible; }
+  body.printing-report .report-card { width: 100%; max-height: none; padding: 0; overflow: visible; border: 0; background: #fff !important; box-shadow: none; color: #000; animation: none; }
+  body.printing-report .report-card *, body.printing-report .report-stats strong { color: #000 !important; }
+  body.printing-report h3, body.printing-report table { break-inside: avoid; }
+}

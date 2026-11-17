@@ -10,6 +10,8 @@ const KEYS = {
   categoryBudgets: "money-dashboard-category-budgets",
   goals: "money-dashboard-goals",
   subscriptions: "money-dashboard-subscriptions",
+  debts: "money-dashboard-debts",
+  debtPlan: "money-dashboard-debt-plan",
   layout: "money-dashboard-layout",
   challenges: "money-dashboard-challenges",
   notifyPrefs: "money-dashboard-notify-prefs",
@@ -124,6 +126,8 @@ let categories = load(KEYS.categories, ["Bills", "Eating out", "Groceries", "Inc
 let categoryBudgets = load(KEYS.categoryBudgets, []);
 let goals = load(KEYS.goals, []);
 let subscriptions = load(KEYS.subscriptions, []);
+let debts = load(KEYS.debts, []);
+let debtPlan = load(KEYS.debtPlan, {});
 let chartMode = "bars";
 let challenges = load(KEYS.challenges, {});
 let layout = load(KEYS.layout, {});
@@ -343,8 +347,7 @@ function renderTransactions() {
   }
 
   const container = $("spending-by-date-list");
-  if (container) {
-    const groups = {};
+  if (container) {    const groups = {};
     rangeTransactions().filter((t) => t.type === "expense").forEach((t) => {
       groups[t.date] = (groups[t.date] || 0) + t.amount;
     });
@@ -596,6 +599,8 @@ function render() {
   renderCategoryBudgets();
   renderGoals();
   renderSubscriptions();
+  renderDebts();
+  renderForecast();
   renderInsights();
   renderHistory();
   renderChallenges();
@@ -691,8 +696,7 @@ $("budget-form")?.addEventListener("submit", (event) => {
 });
 
 /* Money plan */
-$("plan-amount-btn")?.addEventListener("click", () => {
-  $("allocation-form").reset();
+$("plan-amount-btn")?.addEventListener("click", () => {  $("allocation-form").reset();
   $("allocation-id").value = "";
   $("allocation-submit-btn").textContent = "Add";
   renderAllocations();
@@ -910,7 +914,7 @@ $("period-next")?.addEventListener("click", () => stepPeriod(1));
 $("export-data-btn")?.addEventListener("click", () => {
   const backup = {
     version: 1, exportedAt: new Date().toISOString(), transactions, bills, allocations,
-    monthlyBudget, categories, categoryBudgets, goals, subscriptions, challenges, layout, notifyPrefs,
+    monthlyBudget, categories, categoryBudgets, goals, subscriptions, debts, debtPlan, challenges, layout, notifyPrefs,
     theme: localStorage.getItem(KEYS.theme)
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
@@ -940,6 +944,12 @@ $("import-data-input")?.addEventListener("change", async (event) => {
     categoryBudgets = Array.isArray(data.categoryBudgets) ? data.categoryBudgets : [];
     goals = Array.isArray(data.goals) ? data.goals : [];
     subscriptions = Array.isArray(data.subscriptions) ? data.subscriptions.map(cleanSubscription).filter(Boolean) : [];
+    debts = Array.isArray(data.debts) ? data.debts.map(cleanDebt).filter(Boolean) : [];
+    debtPlan = {
+      strategy: ["avalanche", "snowball"].includes(data.debtPlan?.strategy) ? data.debtPlan.strategy : "avalanche",
+      extra: validAmount(data.debtPlan?.extra, true) ?? 0
+    };
+    save(KEYS.debts, debts); save(KEYS.debtPlan, debtPlan);
     monthlyBudget = validAmount(data.monthlyBudget, true) ?? DEFAULT_BUDGET;
     challenges = data.challenges && typeof data.challenges === "object" ? data.challenges : {};
     layout = data.layout && typeof data.layout === "object" ? data.layout : {};
@@ -1038,8 +1048,7 @@ function openSubscription(id = "") {
   $("subscription-modal-title").textContent = sub ? "Edit subscription" : "Add subscription";
   formError("subscription-form-error", "");
   openModal("subscription-modal");
-}
-$("add-subscription-btn")?.addEventListener("click", () => openSubscription());
+}$("add-subscription-btn")?.addEventListener("click", () => openSubscription());
 $("subscription-form")?.addEventListener("submit", (event) => {
   event.preventDefault();
   const id = $("subscription-id").value;
@@ -1177,7 +1186,7 @@ if ($("calc-type")) {
 /* Dashboard customisation */
 const SECTIONS = [
   ["summary", "Summary cards"], ["plan", "Money plan and bills"], ["categories", "Category budgets"],
-  ["goals", "Savings goals"], ["subscriptions", "Subscriptions"], ["challenges", "Challenges and achievements"],
+  ["goals", "Savings goals"], ["subscriptions", "Subscriptions"], ["debts", "Debt tracker"], ["forecast", "Financial forecast"], ["challenges", "Challenges and achievements"],
   ["activity", "Spending and recent transactions"], ["insights", "Insights"], ["tools", "Calculators"],
   ["data", "Backup and export"]
 ];
@@ -1390,7 +1399,7 @@ $("export-csv-btn")?.addEventListener("click", () => {
 /* Reminders and notification centre */
 const NOTIFY_TYPES = [
   ["bills", "Bill reminders and overdue bills"], ["subscriptions", "Subscription renewals"],
-  ["budgets", "Budget limit warnings"], ["goals", "Savings goal deadlines"],
+  ["budgets", "Budget limit warnings"], ["goals", "Savings goal deadlines"], ["debts", "Debt payment due dates"],
   ["backup", "Backup reminders"], ["summary", "Weekly summary"]
 ];
 function notifyOn(type) { return notifyPrefs[type] !== false; }
@@ -1429,6 +1438,12 @@ function buildNotifications() {
       const days = daysBetween(now, goal.deadline);
       if (days < 0) list.push({ level: "warn", text: `The target date for "${goal.name}" has passed.` });
       else if (days <= 30) list.push({ level: "info", text: `"${goal.name}" is due in ${days} day${days === 1 ? "" : "s"} and you still need ${money(goal.target - goal.saved)}.` });
+    });
+  }
+  if (notifyOn("debts")) {
+    debts.filter((d) => d.balance > 0).forEach((debt) => {
+      const days = daysBetween(now, nextDebtDue(debt));
+      if (days <= 7) list.push({ level: "info", text: `${debt.name} payment of ${money(Math.min(debt.minimum, debt.balance))} is due ${days === 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`}.` });
     });
   }
   if (notifyOn("backup")) {
@@ -1579,6 +1594,394 @@ $("weeks52-grid")?.addEventListener("click", (event) => {
   saveChallenges();
   renderChallenges();
 });
+
+/* Debt tracker */
+const DEBT_TYPES = ["Credit card", "Personal loan", "Student loan", "Buy now pay later", "Other"];
+function cleanDebt(item) {
+  if (!item || !String(item.name || "").trim()) return null;
+  const balance = validAmount(item.balance, true);
+  const original = validAmount(item.original);
+  const rateValue = Number(item.rate ?? 0);
+  const minimum = validAmount(item.minimum);
+  const dueDay = Number(item.dueDay);
+  if (balance === null || original === null || minimum === null || !Number.isFinite(rateValue) ||
+      item.balance === "" || item.rate === "" || item.dueDay === "" ||
+      rateValue < 0 || rateValue > 100 || !Number.isInteger(dueDay) || !(dueDay >= 1 && dueDay <= 31)) return null;
+  return {
+    id: String(item.id || uid()), name: String(item.name).trim(),
+    type: DEBT_TYPES.includes(item.type) ? item.type : "Other",
+    original: Math.max(original, balance), balance, rate: rateValue, minimum, dueDay,
+    payments: (Array.isArray(item.payments) ? item.payments : [])
+      .filter((p) => p && validAmount(p.amount) && validDate(p.date)).map((p) => ({ date: p.date, amount: Number(p.amount) }))
+  };
+}
+debts = (Array.isArray(debts) ? debts : []).map(cleanDebt).filter(Boolean);
+if (!["avalanche", "snowball"].includes(debtPlan.strategy)) debtPlan = { ...debtPlan, strategy: "avalanche" };
+debtPlan.extra = validAmount(debtPlan.extra, true) ?? 0;
+function saveDebts() { save(KEYS.debts, debts); }
+function nextDebtDue(debt) {
+  const now = today();
+  for (let i = 0; i < 3; i++) {
+    const month = shiftMonth(now, i);
+    const day = Math.min(debt.dueDay, new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate());
+    const candidate = `${month.slice(0, 7)}-${pad(day)}`;
+    if (candidate >= now) return candidate;
+  }
+  return now;
+}
+function debtOrder(list, strategy) {
+  return list.slice().sort((a, b) => strategy === "snowball" ? a.balance - b.balance || b.rate - a.rate : b.rate - a.rate || a.balance - b.balance);
+}
+function simulateDebts(strategy, extra) {
+  const items = debts.filter((d) => d.balance > 0.005).map((d) => ({ id: d.id, balance: d.balance, rate: d.rate / 1200, minimum: d.minimum, rawRate: d.rate }));
+  const result = { months: 0, interest: 0, payoff: {}, never: false };
+  const total = extra + items.reduce((sum, d) => sum + d.minimum, 0);
+  while (items.some((d) => d.balance > 0.005)) {
+    if (result.months >= 600) { result.never = true; break; }
+    result.months++;
+    items.forEach((d) => { if (d.balance > 0) { const interest = d.balance * d.rate; d.balance += interest; result.interest += interest; } });
+    let pool = total;
+    items.forEach((d) => { if (d.balance > 0) { const pay = Math.min(d.minimum, d.balance); d.balance -= pay; pool -= pay; } });
+    const queue = items.filter((d) => d.balance > 0.005).sort((a, b) => strategy === "snowball" ? a.balance - b.balance || b.rawRate - a.rawRate : b.rawRate - a.rawRate || a.balance - b.balance);
+    for (const d of queue) { const pay = Math.min(pool, d.balance); d.balance -= pay; pool -= pay; }
+    items.forEach((d) => { if (d.balance <= 0.005 && !(d.id in result.payoff)) result.payoff[d.id] = result.months; });
+  }
+  return result;
+}
+function monthsFromNow(months) {
+  const date = shiftMonth(today(), months);
+  return formatDate(date, { month: "long", year: "numeric" });
+}
+function renderDebts() {
+  const list = $("debt-list");
+  if (!list) return;
+  const owing = debts.reduce((sum, d) => sum + d.balance, 0);
+  const active = debts.filter((d) => d.balance > 0.005);
+  $("debt-total").textContent = money(owing);
+  $("debt-minimums").textContent = money(active.reduce((sum, d) => sum + d.minimum, 0));
+  $("debt-strategy").value = debtPlan.strategy;
+  if (document.activeElement !== $("debt-extra")) $("debt-extra").value = debtPlan.extra;
+  const plan = simulateDebts(debtPlan.strategy, debtPlan.extra);
+  let summary = "";
+  if (!debts.length) summary = "Add a credit card, loan or student loan to see your payoff plan.";
+  else if (!active.length) summary = "You are debt free. Brilliant work!";
+  else if (plan.never) summary = "Not paid off within 50 years in this estimate. Consider increasing payments.";
+  else {
+    const other = simulateDebts(debtPlan.strategy === "avalanche" ? "snowball" : "avalanche", debtPlan.extra);
+    const saved = other.interest - plan.interest;
+    summary = `Estimated ${plan.months} month${plan.months === 1 ? "" : "s"} and ${money(plan.interest)} interest, assuming fixed rates and monthly payments; fees are excluded.` +
+      (!other.never && saved > 0.5 ? ` This strategy saves about ${money(saved)} compared with ${debtPlan.strategy === "avalanche" ? "snowball" : "avalanche"}.` : "");
+  }
+  $("debt-free").textContent = active.length && !plan.never ? monthsFromNow(plan.months) : active.length ? "Not on track" : debts.length ? "Debt free" : "-";
+  $("debt-summary").textContent = summary;
+  const first = debtOrder(active, debtPlan.strategy)[0]?.id;
+  list.innerHTML = debts.length ? debts.map((d) => {
+    const percent = Math.min(100, Math.round((d.original - d.balance) / d.original * 100));
+    const paidOff = d.balance <= 0.005;
+    const month = plan.payoff[d.id];
+    const due = paidOff ? "" : `Due ${formatDate(nextDebtDue(d), { day: "numeric", month: "short" })}`;
+    return `<article class="goal-card debt-card ${paidOff ? "goal-complete" : ""}">
+      <div class="category-budget-head"><strong>${esc(d.name)} ${d.id === first && active.length > 1 ? `<span class="pill">Pay first</span>` : ""}</strong><span>${money(d.balance)} / ${money(d.original)}</span></div>
+      <progress max="100" value="${percent}" aria-label="${esc(d.name)} ${percent}% repaid"></progress>
+      <div class="category-budget-foot"><span>${esc(d.type)} · ${d.rate}% a year · min ${money(d.minimum)} · ${percent}% repaid</span>
+        <span class="transaction-actions">
+          ${paidOff ? "" : `<button class="mini-btn pay-debt" data-id="${esc(d.id)}" type="button">Pay</button>`}
+          <button class="mini-btn edit-debt" data-id="${esc(d.id)}" type="button">Edit</button>
+          <button class="mini-btn delete-debt" data-id="${esc(d.id)}" type="button">Delete</button>
+        </span>
+      </div>
+      <small class="goal-timing">${paidOff ? "Paid off" : `${due}${month ? ` · paid off ${monthsFromNow(month)}` : ""}`}</small>
+    </article>`;
+  }).join("") : `<p class="empty-state">No debts tracked yet.</p>`;
+}
+function openDebt(id = "") {
+  const debt = debts.find((d) => d.id === id);
+  $("debt-form").reset();
+  $("debt-id").value = debt?.id || "";
+  $("debt-name").value = debt?.name || "";
+  $("debt-type").value = debt?.type || "Credit card";
+  $("debt-original").value = debt?.original ?? "";
+  $("debt-balance").value = debt?.balance ?? "";
+  $("debt-rate").value = debt?.rate ?? 0;
+  $("debt-minimum").value = debt?.minimum ?? "";
+  $("debt-day").value = debt?.dueDay ?? 1;
+  $("debt-modal-title").textContent = debt ? "Edit debt" : "Add debt";
+  formError("debt-form-error", "");
+  openModal("debt-modal");
+}
+$("add-debt-btn")?.addEventListener("click", () => openDebt());
+$("debt-form")?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const id = $("debt-id").value;
+  const old = debts.find((d) => d.id === id);
+  const debt = cleanDebt({
+    id: id || uid(), name: $("debt-name").value, type: $("debt-type").value, original: $("debt-original").value,
+    balance: $("debt-balance").value, rate: $("debt-rate").value, minimum: $("debt-minimum").value,
+    dueDay: $("debt-day").value, payments: old?.payments || []
+  });
+  if (!debt) return formError("debt-form-error", "Enter a name, balances above zero, a rate from 0 to 100, a minimum payment and a due day from 1 to 31.");
+  debts = id ? debts.map((d) => d.id === id ? debt : d) : [...debts, debt];
+  saveDebts();
+  render();
+  closeModal("debt-modal");
+});
+$("debt-strategy")?.addEventListener("change", () => {
+  debtPlan = { ...debtPlan, strategy: $("debt-strategy").value };
+  save(KEYS.debtPlan, debtPlan);
+  renderDebts();
+});
+$("debt-extra")?.addEventListener("input", () => {
+  debtPlan = { ...debtPlan, extra: validAmount($("debt-extra").value, true) ?? 0 };
+  save(KEYS.debtPlan, debtPlan);
+  renderDebts();
+});
+$("debt-pay-form")?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const debt = debts.find((d) => d.id === $("debt-pay-id").value);
+  const amount = validAmount($("debt-pay-amount").value);
+  const date = $("debt-pay-date").value;
+  if (!debt || amount === null || !validDate(date)) return formError("debt-pay-error", "Enter a payment above zero and a valid date.");
+  if (amount > debt.balance) return formError("debt-pay-error", `Payment cannot exceed the current balance of ${money(debt.balance)}.`);
+  const applied = amount;
+  debts = debts.map((d) => d.id === debt.id ? { ...d, balance: Math.round((d.balance - applied) * 100) / 100, payments: [...d.payments, { date, amount: applied }] } : d);
+  saveDebts();
+  if ($("debt-pay-expense").checked) {
+    rememberCategory("Debt repayment");
+    transactions.push({ id: uid(), type: "expense", amount: applied, description: `${debt.name} payment`, category: "Debt repayment", date, notes: "Debt payment" });
+    saveTransactions();
+  }
+  render();
+  closeModal("debt-pay-modal");
+});
+if ($("debt-pay-form")) {
+  const hint = document.createElement("p");
+  hint.className = "modal-hint";
+  hint.textContent = "The payment reduces the balance you entered; interest is not added automatically. An optional expense is separate: editing or deleting it will not change this balance.";
+  $("debt-pay-form").insertBefore(hint, $("debt-pay-form").querySelector(".modal-actions"));
+}
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (!button) return;
+  if (button.matches(".edit-debt")) openDebt(button.dataset.id);
+  else if (button.matches(".pay-debt")) {
+    const debt = debts.find((d) => d.id === button.dataset.id);
+    if (!debt) return;
+    $("debt-pay-form").reset();
+    $("debt-pay-expense").checked = false;
+    $("debt-pay-id").value = debt.id;
+    $("debt-pay-amount").value = Math.min(debt.minimum, debt.balance);
+    $("debt-pay-date").value = today();
+    $("debt-pay-title").textContent = `Record payment: ${debt.name}`;
+    formError("debt-pay-error", "");
+    openModal("debt-pay-modal");
+  } else if (button.matches(".delete-debt") && confirm("Delete this debt?")) {
+    debts = debts.filter((d) => d.id !== button.dataset.id);
+    saveDebts();
+    render();
+  }
+});
+
+/* Financial forecasting */
+function monthExpenseIncome(anchor) {
+  const items = rangeTransactions(periodRange("month", anchor));
+  return {
+    count: items.length,
+    spent: items.filter((t) => t.type === "expense").reduce((sum, t) => sum + t.amount, 0),
+    income: items.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0)
+  };
+}
+function renderForecast() {
+  const box = $("forecast-month");
+  if (!box) return;
+  const now = today();
+  const range = periodRange("month", now);
+  const daysInMonth = daysBetween(range.start, range.end) + 1;
+  const elapsed = daysBetween(range.start, now) + 1;
+  const current = monthExpenseIncome(now);
+  const projected = current.spent / elapsed * daysInMonth;
+  const diff = monthlyBudget - projected;
+  box.innerHTML = `<p>Spent so far <strong>${money(current.spent)}</strong> (day ${elapsed} of ${daysInMonth})</p>
+    <p>Projected month-end spending <strong>${money(projected)}</strong></p>
+    <p class="${diff < 0 ? "forecast-over" : "forecast-ok"}">${monthlyBudget <= 0 ? "Set a monthly budget to compare." : diff < 0
+      ? `On this pace you will go ${money(-diff)} over your ${money(monthlyBudget)} budget.`
+      : `On this pace you will finish ${money(diff)} under your ${money(monthlyBudget)} budget.`}</p>`;
+  const past = [1, 2, 3].map((i) => monthExpenseIncome(shiftMonth(now, -i))).filter((m) => m.count > 0);
+  const avg = (key) => past.length ? past.reduce((sum, m) => sum + m[key], 0) / past.length : 0;
+  const spend = avg("spent");
+  const income = avg("income");
+  $("forecast-basis").textContent = past.length
+    ? `Cumulative projected income minus spending, starting at zero; based on the average of ${past.length} of the last 3 months with recorded transactions: ${money(income)} income and ${money(spend)} spending. Incomplete records can skew this estimate.`
+    : "";
+  if (!past.length) {
+    $("forecast-list").innerHTML = `<li class="empty-state">Record income and spending in a previous month to see an estimate.</li>`;
+    return;
+  }
+  let running = 0;
+  const rows = [1, 2, 3, 4, 5, 6].map((i) => {
+    const net = income - spend;
+    running += net;
+    return { label: formatDate(shiftMonth(now, i), { month: "short", year: "numeric" }), net, running };
+  });
+  const max = Math.max(1, ...rows.map((r) => Math.abs(r.running)));
+  $("forecast-list").innerHTML = rows.map((r) => `<li>
+    <span>${esc(r.label)}</span>
+    <span class="forecast-track"><span class="forecast-fill ${r.running < 0 ? "negative" : ""}" style="width:${Math.max(2, Math.round(Math.abs(r.running) / max * 100))}%"></span></span>
+    <strong>${money(r.running)}</strong></li>`).join("");
+}
+
+/* CSV import */
+function parseCsv(text) {
+  const clean = text.replace(/^\uFEFF/, "");
+  const rows = [];
+  let row = [], cell = "", quoted = false, closedQuote = false;
+  for (let i = 0; i < clean.length; i++) {
+    const char = clean[i];
+    if (quoted) {
+      if (char === '"' && clean[i + 1] === '"') { cell += '"'; i++; }
+      else if (char === '"') { quoted = false; closedQuote = true; }
+      else cell += char;
+    } else if (char === '"') {
+      if (cell || closedQuote) throw new Error("Invalid quote in CSV.");
+      quoted = true;
+    } else if (char === ",") { row.push(cell); cell = ""; closedQuote = false; }
+    else if (char === "\n" || char === "\r") {
+      if (char === "\r" && clean[i + 1] === "\n") i++;
+      row.push(cell); cell = "";
+      if (row.some((c) => c.trim() !== "")) rows.push(row);
+      row = []; closedQuote = false;
+    } else {
+      if (closedQuote) throw new Error("Unexpected text after a quoted CSV field.");
+      cell += char;
+    }
+  }
+  if (quoted) throw new Error("Unclosed quoted CSV field.");
+  row.push(cell);
+  if (row.some((c) => c.trim() !== "")) rows.push(row);
+  return rows;
+}
+function importCsvRows(rows) {
+  const header = rows[0].map((h) => h.trim().toLowerCase());
+  if (new Set(header).size !== header.length) throw new Error("Duplicate column names.");
+  const find = (name) => header.indexOf(name);
+  const cols = {
+    date: find("date"), type: find("type"), description: find("description"),
+    category: find("category"), amount: find("amount"), notes: find("notes")
+  };
+  if (cols.date < 0 || cols.type < 0 || cols.amount < 0) throw new Error("Columns Date, Type and Amount are required.");
+  const result = { added: [], duplicates: 0 };
+  const seen = new Set(transactions.map((t) => `${t.date}|${t.type}|${t.amount.toFixed(2)}|${t.description.toLowerCase()}`));
+  rows.slice(1).forEach((cells, index) => {
+    const row = index + 2;
+    if (cells.length !== header.length) throw new Error(`Row ${row}: incorrect number of columns.`);
+    const date = cells[cols.date].trim();
+    const type = cells[cols.type].trim().toLowerCase();
+    const amountText = cells[cols.amount].trim();
+    if (!validDate(date)) throw new Error(`Row ${row}: use a valid YYYY-MM-DD date.`);
+    if (!["income", "expense"].includes(type)) throw new Error(`Row ${row}: type must be income or expense.`);
+    if (!/^\d+(?:\.\d{1,2})?$/.test(amountText) || !validAmount(amountText)) throw new Error(`Row ${row}: amount must be positive, with a decimal point and no separators.`);
+    const description = (cells[cols.description] || "").trim() || "Imported transaction";
+    const wanted = (cells[cols.category] || "").trim();
+    const category = categories.find((c) => c.toLowerCase() === wanted.toLowerCase()) || wanted || (type === "income" ? "Income" : "Other");
+    const item = { id: uid(), type, amount: Number(amountText), description, category, date, notes: cells[cols.notes] || "" };
+    const key = `${date}|${type}|${item.amount.toFixed(2)}|${description.toLowerCase()}`;
+    if (seen.has(key)) result.duplicates++;
+    seen.add(key);
+    result.added.push(item);
+  });
+  return result;
+}
+$("import-csv-input")?.addEventListener("change", async (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  try {
+    const rows = parseCsv(await file.text());
+    if (rows.length < 2) throw new Error("The CSV must contain a header and at least one transaction.");
+    const result = importCsvRows(rows);
+    if (!confirm(`Import ${result.added.length} transaction${result.added.length === 1 ? "" : "s"}?${result.duplicates ? `\n${result.duplicates} may be duplicates and will also be imported.` : ""}`)) return;
+    result.added.forEach((t) => rememberCategory(t.category));
+    transactions = [...transactions, ...result.added];
+    saveTransactions();
+    render();
+    showMessage("backup-message", `Imported ${result.added.length} transaction${result.added.length === 1 ? "" : "s"}.`);
+  } catch (error) {
+    console.error("Could not import CSV:", error);
+    showMessage("backup-message", `Import failed: ${error.message} No transactions were imported.`);
+  } finally {
+    event.target.value = "";
+  }
+});
+if ($("import-csv-input")) {
+  const hint = document.createElement("p");
+  hint.className = "modal-hint";
+  hint.textContent = "CSV import uses Date, Type and Amount columns: YYYY-MM-DD dates, income/expense types and positive decimal amounts (no thousands separators). Exported spreadsheet-safety apostrophes are kept; use JSON backups for an exact restore.";
+  $("import-csv-input").closest(".panel-buttons").after(hint);
+}
+
+/* PDF financial report (uses the browser's Save as PDF) */
+function buildReport(month) {
+  const range = periodRange("month", `${month}-01`);
+  const items = rangeTransactions(range);
+  const expenses = items.filter((t) => t.type === "expense");
+  const income = items.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
+  const spent = expenses.reduce((sum, t) => sum + t.amount, 0);
+  const byCategory = {};
+  expenses.forEach((t) => { byCategory[t.category] = (byCategory[t.category] || 0) + t.amount; });
+  const cats = Object.entries(byCategory).sort((a, b) => b[1] - a[1]);
+  const saved = income - spent;
+  const rate = income > 0 ? Math.round(saved / income * 100) : null;
+  const billRows = billOccurrences(range);
+  const table = (head, rows) => `<table><thead><tr>${head.map((h, i) => `<th${i ? ' class="num"' : ""}>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table>`;
+  return `<h2>${esc(formatDate(range.start, { month: "long", year: "numeric" }))}</h2>
+    <p class="report-sub">Money Planner report · created ${esc(formatDate(today(), { day: "numeric", month: "long", year: "numeric" }))}</p>
+    <div class="report-stats">
+      <p>Income<strong>${money(income)}</strong></p><p>Spent<strong>${money(spent)}</strong></p>
+      <p>Net<strong>${money(saved)}</strong></p><p>Budget<strong>${money(monthlyBudget)}</strong></p>
+      <p>Saved<strong>${rate === null ? "-" : `${rate}%`}</strong></p></div>
+    <h3>Spending by category</h3>
+    ${cats.length ? table(["Category", "Spent", "Share"], cats.map(([c, v]) => `<tr><td>${esc(c)}</td><td class="num">${money(v)}</td><td class="num">${Math.round(v / spent * 100)}%</td></tr>`)) : "<p>No spending recorded.</p>"}
+    <h3>Bills</h3>
+    ${billRows.length ? table(["Bill", "Amount", "Status"], billRows.map((b) => `<tr><td>${esc(b.bill.name)} (${esc(formatDate(b.date, { day: "numeric", month: "short" }))})</td><td class="num">${money(b.bill.amount)}</td><td class="num">${b.paid ? "Paid" : "Unpaid"}</td></tr>`)) : "<p>No bills this month.</p>"}
+    <h3>Savings goals (current)</h3>
+    ${goals.length ? table(["Goal", "Saved", "Target"], goals.map((g) => `<tr><td>${esc(g.name)}</td><td class="num">${money(g.saved)}</td><td class="num">${money(g.target)}</td></tr>`)) : "<p>No savings goals.</p>"}
+    <h3>Debts (current)</h3>
+    ${debts.length ? table(["Debt", "Balance", "Rate"], debts.map((d) => `<tr><td>${esc(d.name)}</td><td class="num">${money(d.balance)}</td><td class="num">${d.rate}%</td></tr>`)) : "<p>No debts tracked.</p>"}
+    <h3>Subscriptions (current)</h3>
+    ${subscriptions.length ? table(["Subscription", "Per month", "Per year"], subscriptions.map((s) => `<tr><td>${esc(s.name)}</td><td class="num">${money(s.amount * CYCLES[s.cycle].perMonth)}</td><td class="num">${money(s.amount * CYCLES[s.cycle].perMonth * 12)}</td></tr>`)) : "<p>No subscriptions.</p>"}`;
+}
+function renderReport() {
+  const month = $("report-month").value || today().slice(0, 7);
+  $("report-body").innerHTML = buildReport(month);
+}
+$("report-btn")?.addEventListener("click", () => {
+  $("report-month").value = today().slice(0, 7);
+  renderReport();
+  openModal("report-modal");
+});
+$("report-month")?.addEventListener("change", renderReport);
+$("report-print-btn")?.addEventListener("click", () => {
+  document.body.classList.add("printing-report");
+  window.print();
+});
+window.addEventListener("afterprint", () => document.body.classList.remove("printing-report"));
+
+/* Installable app (PWA) */
+let installPrompt = null;
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  installPrompt = event;
+  if ($("install-btn")) $("install-btn").hidden = false;
+});
+$("install-btn")?.addEventListener("click", async () => {
+  if (!installPrompt) return;
+  installPrompt.prompt();
+  await installPrompt.userChoice;
+  installPrompt = null;
+  $("install-btn").hidden = true;
+});
+window.addEventListener("appinstalled", () => { if ($("install-btn")) $("install-btn").hidden = true; });
+if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch((error) => console.error("Service worker failed:", error)));
+}
 
 renderCategoryOptions();
 render();

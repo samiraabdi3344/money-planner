@@ -4,6 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Money Dashboard</title>
+  <meta name="theme-color" content="#7b67d9" />
+  <meta name="description" content="Plan your budget, bills, savings and debts in one private dashboard." />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icon.svg" />
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="themes.css" />
 </head>
@@ -152,6 +157,47 @@
           <ul class="bill-list" id="subscription-list" aria-live="polite"></ul>
         </section>
 
+        <section class="panel" id="debts-panel" data-section="debts">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Debt and repayments</p>
+              <h2>Debt tracker</h2>
+            </div>
+            <button id="add-debt-btn" class="secondary-btn" type="button">+ Add debt</button>
+          </div>
+          <div class="sub-totals">
+            <p>Total owing <strong id="debt-total">$0.00</strong></p>
+            <p>Monthly minimums <strong id="debt-minimums">$0.00</strong></p>
+            <p>Debt-free <strong id="debt-free">-</strong></p>
+          </div>
+          <div class="debt-plan">
+            <label class="modal-label"><span>Repayment strategy</span>
+              <select id="debt-strategy">
+                <option value="avalanche">Avalanche (highest interest first)</option>
+                <option value="snowball">Snowball (smallest balance first)</option>
+              </select>
+            </label>
+            <label class="modal-label"><span>Extra paid each month</span>
+              <input id="debt-extra" type="number" min="0" step="1" value="0" />
+            </label>
+          </div>
+          <p id="debt-summary" class="modal-hint" aria-live="polite"></p>
+          <div id="debt-list" class="debt-list"></div>
+        </section>
+
+        <section class="panel" id="forecast-panel" data-section="forecast">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Looking ahead</p>
+              <h2>Financial forecast</h2>
+            </div>
+          </div>
+          <div id="forecast-month" class="forecast-month"></div>
+          <h3 class="forecast-title">Next 6 months</h3>
+          <p id="forecast-basis" class="modal-hint"></p>
+          <ul id="forecast-list" class="forecast-list"></ul>
+        </section>
+
         <section class="panel" id="challenges-panel" data-section="challenges">
           <div class="panel-head">
             <div>
@@ -264,6 +310,12 @@
           <div class="panel-buttons">
             <button id="export-data-btn" class="secondary-btn" type="button">Download backup</button>
             <button id="export-csv-btn" class="secondary-btn" type="button">Export transactions (CSV)</button>
+            <label class="secondary-btn file-button">
+              Import transactions (CSV)
+              <input id="import-csv-input" type="file" accept=".csv,text/csv" />
+            </label>
+            <button id="report-btn" class="secondary-btn" type="button">Financial report (PDF)</button>
+            <button id="install-btn" class="secondary-btn" type="button" hidden>Install app</button>
             <label class="secondary-btn file-button">
               Restore backup
               <input id="import-data-input" type="file" accept="application/json,.json" />
@@ -519,6 +571,74 @@
           <button class="primary-btn" type="submit">Save</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="debt-modal" role="dialog" aria-modal="true" aria-labelledby="debt-modal-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="debt-modal-title">Add debt</h3>
+        <button class="close-btn" type="button" data-close="debt-modal" aria-label="Close">×</button>
+      </div>
+      <form id="debt-form" novalidate>
+        <div id="debt-form-error" class="form-error" aria-live="polite"></div>
+        <input type="hidden" id="debt-id" />
+        <label class="modal-label"><span>Name</span><input id="debt-name" type="text" required /></label>
+        <label class="modal-label"><span>Type</span>
+          <select id="debt-type">
+            <option>Credit card</option>
+            <option>Personal loan</option>
+            <option>Student loan</option>
+            <option>Buy now pay later</option>
+            <option>Other</option>
+          </select>
+        </label>
+        <label class="modal-label"><span>Amount borrowed or starting balance</span><input id="debt-original" type="number" min="0.01" step="0.01" required /></label>
+        <label class="modal-label"><span>Current balance</span><input id="debt-balance" type="number" min="0" step="0.01" required /></label>
+        <label class="modal-label"><span>Interest rate (% per year)</span><input id="debt-rate" type="number" min="0" max="100" step="0.01" value="0" required /></label>
+        <label class="modal-label"><span>Minimum monthly payment</span><input id="debt-minimum" type="number" min="0.01" step="0.01" required /></label>
+        <label class="modal-label"><span>Payment due day of month (1-31)</span><input id="debt-day" type="number" min="1" max="31" step="1" value="1" required /></label>
+        <div class="modal-actions">
+          <button class="secondary-btn" type="button" data-close="debt-modal">Cancel</button>
+          <button class="primary-btn" type="submit">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="debt-pay-modal" role="dialog" aria-modal="true" aria-labelledby="debt-pay-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="debt-pay-title">Record payment</h3>
+        <button class="close-btn" type="button" data-close="debt-pay-modal" aria-label="Close">×</button>
+      </div>
+      <form id="debt-pay-form" novalidate>
+        <div id="debt-pay-error" class="form-error" aria-live="polite"></div>
+        <input type="hidden" id="debt-pay-id" />
+        <label class="modal-label"><span>Amount paid</span><input id="debt-pay-amount" type="number" min="0.01" step="0.01" required /></label>
+        <label class="modal-label"><span>Date</span><input id="debt-pay-date" type="date" required /></label>
+        <label class="check-label"><input id="debt-pay-expense" type="checkbox" checked /> Also add it as an expense (category: Debt repayment)</label>
+        <div class="modal-actions">
+          <button class="secondary-btn" type="button" data-close="debt-pay-modal">Cancel</button>
+          <button class="primary-btn" type="submit">Record payment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="report-modal" role="dialog" aria-modal="true" aria-labelledby="report-title">
+    <div class="modal-card report-card">
+      <div class="modal-header no-print">
+        <h3 id="report-title">Financial report</h3>
+        <button class="close-btn" type="button" data-close="report-modal" aria-label="Close">×</button>
+      </div>
+      <label class="modal-label no-print"><span>Month</span><input id="report-month" type="month" /></label>
+      <div id="report-body" class="report-body"></div>
+      <div class="modal-actions no-print">
+        <button class="secondary-btn" type="button" data-close="report-modal">Close</button>
+        <button id="report-print-btn" class="primary-btn" type="button">Save as PDF / Print</button>
+      </div>
+      <p class="modal-hint no-print">In the print window choose "Save as PDF" as the destination.</p>
     </div>
   </div>
 
