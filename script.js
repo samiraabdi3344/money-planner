@@ -268,10 +268,10 @@ if (transactionForm) {
 
     transactionForm.reset();
 
-const transactionIdInput = document.getElementById("transaction-id");
-if (transactionIdInput) transactionIdInput.value = "";
+    const transactionIdInput = document.getElementById("transaction-id");
+    if (transactionIdInput) transactionIdInput.value = "";
 
-transactionModal.classList.add("hidden");
+    transactionModal.classList.add("hidden");
   });
 }
 document.addEventListener("DOMContentLoaded", () => {

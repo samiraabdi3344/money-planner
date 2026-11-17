@@ -153,17 +153,15 @@
       <input id="planned-amount" type="number" min="0" step="5" value="0" />
     </label>
 
-       <label class="modal-label">
-        <span>Notes (optional)</span>
-        <input name="notes" type="text" placeholder="Add a note">
-      </label>
+    <label class="modal-label">
+      <span>Note</span>
+      <input type="text" placeholder="Bills, savings, travel..." />
+    </label>
 
-      <p id="transaction-form-error" class="form-error" role="alert"></p>
-
-      <div class="modal-actions">
-        <button class="secondary-btn" type="button" data-close="transaction-modal">Cancel</button>
-        <button class="primary-btn" type="submit">Add</button>
-      </div>
+    <div class="modal-actions">
+      <button class="secondary-btn" type="button" data-close="plan-modal">Cancel</button>
+      <button class="primary-btn save-plan-btn">Save</button>
+    </div>
   </div>
 </div>
 
@@ -173,8 +171,8 @@
       <h3>Add transaction</h3>
       <button type="button" class="close-btn" data-close="transaction-modal">×</button>
     </div>
-      <input type="hidden" name="id" id="transaction-id" />
-        <form id="transaction-form">
+
+    <form id="transaction-form">
       <input type="hidden" name="id" id="transaction-id" />
 
       <label class="modal-label">
