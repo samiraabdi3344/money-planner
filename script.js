@@ -2010,3 +2010,5 @@ if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
 }
 
 renderCategoryOptions();
+applyLayout();
+render();
