@@ -1232,6 +1232,40 @@ function applyLayout() {
     node.hidden = node.dataset.viewOnly !== currentView;
   });
 }
+function renderCustomize() {
+  const { order, hidden } = layoutState();
+  const names = Object.fromEntries(SECTIONS);
+  $("customize-list").innerHTML = order.map((id, i) => `<li>
+    <label><input type="checkbox" data-section-toggle="${id}" ${hidden.includes(id) ? "" : "checked"} /> ${esc(names[id])}</label>
+    <span class="transaction-actions">
+      <button class="mini-btn" type="button" data-section-move="-1" data-id="${id}" ${i === 0 ? "disabled" : ""} aria-label="Move ${esc(names[id])} up">Up</button>
+      <button class="mini-btn" type="button" data-section-move="1" data-id="${id}" ${i === order.length - 1 ? "disabled" : ""} aria-label="Move ${esc(names[id])} down">Down</button>
+    </span></li>`).join("");
+}
+function saveLayout(next) {
+  layout = next.order ? { ...layout, order: next.order, dashboardVisible: next.order.filter((id) => !next.hidden.includes(id)) } : {};
+  save(KEYS.layout, layout);
+  applyLayout();
+  renderCustomize();
+}
+$("customize-btn")?.addEventListener("click", () => { renderCustomize(); openModal("customize-modal"); });
+$("customize-reset")?.addEventListener("click", () => saveLayout({}));
+$("customize-list")?.addEventListener("change", (event) => {
+  const id = event.target.dataset.sectionToggle;
+  if (!id) return;
+  const { order, hidden } = layoutState();
+  saveLayout({ order, hidden: event.target.checked ? hidden.filter((x) => x !== id) : [...hidden, id] });
+});
+$("customize-list")?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-section-move]");
+  if (!button) return;
+  const { order, hidden } = layoutState();
+  const from = order.indexOf(button.dataset.id);
+  const to = from + Number(button.dataset.sectionMove);
+  if (to < 0 || to >= order.length) return;
+  order.splice(to, 0, order.splice(from, 1)[0]);
+  saveLayout({ order, hidden });
+});
 /* Custom categories: add, rename, delete */
 function syncCategories() {
   transactions.forEach((t) => {
