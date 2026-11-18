@@ -17,15 +17,13 @@
     <aside class="sidebar">
       <a class="brand" href="#" data-nav="overview">Money dashboard</a>
       <nav class="nav" aria-label="Main navigation">
-        <a class="nav-item active" href="#" data-nav="overview">Overview</a>
-        <a class="nav-item" href="#" data-nav="transactions">Transactions</a>
-        <a class="nav-item" href="#" data-nav="budget">Budget</a>
-        <a class="nav-item" href="#" data-nav="insights">Insights</a>
-        <a class="nav-item" href="#" data-nav="earnings">Earnings</a>
-        <a class="nav-item" href="#" data-nav="saver">Saver</a>
-        <a class="nav-item" href="#" data-nav="subscriptions">Subscriptions</a>
-        <a class="nav-item" href="#" data-nav="tools">Calculators</a>
-        <a class="nav-item" href="#" data-nav="challenges">Challenges</a>
+        <a class="nav-item active" href="#" data-nav="dashboard" aria-current="page">Dashboard</a>
+        <a class="nav-item" href="#" data-nav="money">My Money</a>
+        <a class="nav-item" href="#" data-nav="bills">Bills &amp; Subscriptions</a>
+        <a class="nav-item" href="#" data-nav="goals">Goals &amp; Savings</a>
+        <a class="nav-item" href="#" data-nav="insights">Insights &amp; Reports</a>
+        <a class="nav-item" href="#" data-nav="tools">Financial Tools</a>
+        <a class="nav-item" href="#" data-nav="settings">Settings</a>
       </nav>
     </aside>
 
@@ -50,12 +48,14 @@
             </span>
           </label>
           <button id="notify-btn" class="secondary-btn notify-btn" type="button" aria-label="Notifications">Alerts <span id="notify-count" class="badge" hidden>0</span></button>
-          <button id="customize-btn" class="secondary-btn" type="button">Customise</button>
-          <button id="theme-toggle-btn" class="secondary-btn" type="button">Theme</button>
           <button id="add-transaction-btn" class="primary-btn" type="button">+ Add transaction</button>
         </div>
       </header>
 
+      <div class="view-heading">
+        <h2 id="view-title" tabindex="-1">Dashboard</h2>
+        <p id="view-description">Your money at a glance.</p>
+      </div>
       <section id="overview-view">
         <section class="summary-grid" data-section="summary" aria-label="Period summary">
           <article class="summary-card">
@@ -116,6 +116,14 @@
           </article>
         </section>
 
+        <section class="panel" data-view-only="money" hidden>
+          <div class="panel-head">
+            <div><p class="eyebrow">Your spending plan</p><h2>Monthly budget</h2></div>
+            <button id="edit-budget-money-btn" class="secondary-btn" type="button">Edit budget</button>
+          </div>
+          <p>Manage your budget, categories and transaction history here.</p>
+        </section>
+
         <section class="panel" id="category-budgets" data-section="categories">
           <div class="panel-head">
             <div>
@@ -140,6 +148,15 @@
             <button id="add-goal-btn" class="secondary-btn" type="button">+ Add goal</button>
           </div>
           <div id="savings-goal-list" aria-live="polite"></div>
+        </section>
+
+        <section class="panel" data-view-only="bills" hidden>
+          <div class="panel-head">
+            <div><p class="eyebrow">Selected planning period</p><h2>Bills</h2></div>
+            <button id="add-bill-view-btn" class="secondary-btn" type="button">+ Add bill</button>
+          </div>
+          <p>Use the planning period controls above to see bills due in another period.</p>
+          <ul class="bill-list" id="bills-view-list" aria-live="polite"></ul>
         </section>
 
         <section class="panel" id="subscriptions-panel" data-section="subscriptions">
@@ -253,6 +270,7 @@
               <p class="eyebrow">Your money patterns</p>
               <h2>Insights and reports</h2>
             </div>
+            <button id="report-btn" class="secondary-btn" type="button">Financial report (PDF)</button>
           </div>
           <p id="personal-insight" class="insight-message" aria-live="polite"></p>
           <div class="stat-grid" id="insight-stats" aria-live="polite"></div>
@@ -260,7 +278,7 @@
             <article>
               <div class="chart-head">
                 <h3>Spending by category</h3>
-                <span class="segmented" role="group" aria-label="Chart style">
+                                <span class="segmented" role="group" aria-label="Chart style">
                   <button type="button" class="seg-btn active" data-chart-mode="bars">Bars</button>
                   <button type="button" class="seg-btn" data-chart-mode="pie">Pie</button>
                 </span>
@@ -299,6 +317,24 @@
           <div id="calc-result" class="calc-result" aria-live="polite"></div>
         </section>
 
+        <section class="panel" data-view-only="tools" hidden>
+          <div class="panel-head"><div><p class="eyebrow">Learn the basics</p><h2>Financial education</h2></div></div>
+          <div class="education-grid">
+            <article><h3>Budgeting</h3><p>A budget is a plan for how you will use your money. Compare it with your actual spending regularly.</p></article>
+            <article><h3>Emergency fund</h3><p>Setting aside money for unexpected costs can help you avoid taking on debt. Start with an amount that works for you.</p></article>
+            <article><h3>Interest</h3><p>Compound interest can grow savings, but interest on debt increases the amount you owe. Check the terms of each account.</p></article>
+          </div>
+          <p class="modal-hint">General education only, not financial advice.</p>
+        </section>
+
+        <section class="panel" data-view-only="settings" hidden>
+          <div class="panel-head"><div><p class="eyebrow">Make it yours</p><h2>Appearance and dashboard</h2></div></div>
+          <div class="panel-buttons">
+            <button id="customize-btn" class="secondary-btn" type="button">Customise dashboard</button>
+            <button id="theme-toggle-btn" class="secondary-btn" type="button">Choose theme</button>
+          </div>
+        </section>
+
         <section class="panel data-panel" data-section="data">
           <div class="panel-head">
             <div>
@@ -314,7 +350,6 @@
               Import transactions (CSV)
               <input id="import-csv-input" type="file" accept=".csv,text/csv" />
             </label>
-            <button id="report-btn" class="secondary-btn" type="button">Financial report (PDF)</button>
             <button id="install-btn" class="secondary-btn" type="button" hidden>Install app</button>
             <label class="secondary-btn file-button">
               Restore backup
@@ -512,8 +547,7 @@
         <label class="modal-label">
           <span>Category name</span>
           <input id="category-budget-name" type="text" list="category-options" required />
-        </label>
-        <label class="modal-label">
+                  <label class="modal-label">
           <span>Monthly spending limit</span>
           <input id="category-budget-limit" type="number" min="0.01" step="0.01" required />
         </label>

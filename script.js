@@ -136,6 +136,7 @@ let monthlyBudget = validAmount(load(KEYS.budget, DEFAULT_BUDGET), true) ?? DEFA
 let periodType = load(KEYS.period, "month");
 if (!FACTORS[periodType]) periodType = "month";
 let periodAnchor = today();
+let currentView = "dashboard";
 
 if (!Array.isArray(allocations)) {
   const oldPlan = load(KEYS.plan, null);
@@ -178,7 +179,6 @@ if (!Array.isArray(load(KEYS.bills, null))) {
   ];
   saveBills();
 }
-
 function periodRange(type = periodType, anchor = periodAnchor) {
   if (type === "week") {
     const start = addDays(anchor, -((new Date(`${anchor}T00:00:00Z`).getUTCDay() + 6) % 7));
@@ -316,7 +316,7 @@ function renderBills() {
   const list = $("upcoming-bills-list");
   if (!list) return;
   const items = billOccurrences(periodRange());
-  list.innerHTML = items.length ? items.map(({ bill, date, paid }) => `
+  const content = items.length ? items.map(({ bill, date, paid }) => `
     <li class="${paid ? "is-paid" : ""}">
       <span class="bill-name">${esc(bill.name)}<time datetime="${date}">${formatDate(date, { day: "numeric", month: "short" })}${bill.recurring ? " · monthly" : ""}</time></span>
       <strong>${money(bill.amount)}</strong>
@@ -326,6 +326,8 @@ function renderBills() {
         <button class="mini-btn delete-bill" data-id="${esc(bill.id)}" type="button">Delete</button>
       </span>
     </li>`).join("") : `<li class="empty-state">No bills due in this period.</li>`;
+  list.innerHTML = content;
+  if ($("bills-view-list")) $("bills-view-list").innerHTML = content;
 }
 
 /* Transactions and expandable daily spending */
@@ -418,7 +420,6 @@ function renderCategoryBudgets() {
     </article>`;
   }).join("");
 }
-
 /* Savings goals */
 const MILESTONES = [25, 50, 75, 100];
 function goalDetails(goal) {
@@ -589,7 +590,6 @@ function renderHistory() {
   list.innerHTML = items.length ? items.map((t) => row(t, true)).join("")
     : `<li class="empty-state">No transactions match your filters.</li>`;
 }
-
 /* Main render */
 function render() {
   renderSummary();
@@ -685,6 +685,7 @@ $("edit-budget-btn")?.addEventListener("click", () => {
   formError("budget-form-error", "");
   openModal("budget-modal");
 });
+$("edit-budget-money-btn")?.addEventListener("click", () => $("edit-budget-btn").click());
 $("budget-form")?.addEventListener("submit", (event) => {
   event.preventDefault();
   const value = validAmount($("budget-input").value, true);
@@ -737,6 +738,7 @@ $("add-bill-btn")?.addEventListener("click", () => {
   billForm.elements.due.value = periodRange().start;
   openModal("bill-modal");
 });
+$("add-bill-view-btn")?.addEventListener("click", () => $("add-bill-btn").click());
 function editBill(id) {
   const b = bills.find((x) => x.id === id);
   if (!b) return;
@@ -880,26 +882,35 @@ $("history-clear")?.addEventListener("click", () => {
   if ($("history-sort")) $("history-sort").value = "newest";
   renderHistory();
 });
-
 /* Navigation */
 function view(name) {
-  const history = name === "transactions" || name === "earnings";
-  $("overview-view").hidden = history;
-  $("history-view").hidden = !history;
-  if (name === "earnings") $("history-type").value = "income";
-  else if (history) $("history-type").value = "all";
-  if (name === "budget") $("category-budgets").scrollIntoView({ behavior: "smooth" });
-  if (name === "insights") $("insights-panel").scrollIntoView({ behavior: "smooth" });
-  if (name === "saver") $("savings-goals").scrollIntoView({ behavior: "smooth" });
-  if (name === "subscriptions") $("subscriptions-panel").scrollIntoView({ behavior: "smooth" });
-  if (name === "tools") $("tools-panel").scrollIntoView({ behavior: "smooth" });
-  if (name === "challenges") $("challenges-panel").scrollIntoView({ behavior: "smooth" });
-  document.querySelectorAll(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.nav === name));
+  const aliases = { overview: "dashboard", transactions: "money", earnings: "money", budget: "money", saver: "goals", subscriptions: "bills", challenges: "goals" };
+  const target = aliases[name] || name;
+  if (!VIEW_SECTIONS[target]) return;
+  currentView = target;
+  $("history-view").hidden = target !== "money";
+  if (target === "money") $("history-type").value = name === "earnings" ? "income" : "all";
+  $("view-title").textContent = VIEW_SECTIONS[target].title;
+  $("view-description").textContent = VIEW_SECTIONS[target].description;
+  applyLayout();
+  document.querySelectorAll(".nav-item").forEach((item) => {
+    const active = item.dataset.nav === target;
+    item.classList.toggle("active", active);
+    if (active) item.setAttribute("aria-current", "page");
+    else item.removeAttribute("aria-current");
+  });
   renderHistory();
+  $("view-title").focus({ preventScroll: true });
+  window.scrollTo({ top: 0 });
 }
 document.querySelectorAll("[data-nav]").forEach((link) => link.addEventListener("click", (event) => {
   event.preventDefault();
   view(link.dataset.nav);
+  if (link.dataset.type) {
+    $("history-type").value = link.dataset.type;
+    renderHistory();
+  }
+  if (link.dataset.nav === "transactions") $("history-view").scrollIntoView({ behavior: "smooth" });
 }));
 $("period-type")?.addEventListener("change", (event) => {
   periodType = event.target.value;
@@ -984,7 +995,6 @@ document.querySelectorAll(".theme-option").forEach((button) => button.addEventLi
   closeModal("theme-modal");
 }));
 applyTheme(THEMES.includes(localStorage.getItem(KEYS.theme)) ? localStorage.getItem(KEYS.theme) : "theme-botanical-light");
-
 /* Subscriptions */
 const CYCLES = {
   monthly: { label: "Monthly", perMonth: 1 },
@@ -1048,7 +1058,8 @@ function openSubscription(id = "") {
   $("subscription-modal-title").textContent = sub ? "Edit subscription" : "Add subscription";
   formError("subscription-form-error", "");
   openModal("subscription-modal");
-}$("add-subscription-btn")?.addEventListener("click", () => openSubscription());
+}
+$("add-subscription-btn")?.addEventListener("click", () => openSubscription());
 $("subscription-form")?.addEventListener("submit", (event) => {
   event.preventDefault();
   const id = $("subscription-id").value;
@@ -1190,56 +1201,37 @@ const SECTIONS = [
   ["activity", "Spending and recent transactions"], ["insights", "Insights"], ["tools", "Calculators"],
   ["data", "Backup and export"]
 ];
+const VIEW_SECTIONS = {
+  dashboard: { title: "Dashboard", description: "Your money at a glance.", sections: [] },
+  money: { title: "My Money", description: "Transactions, budgets and categories.", sections: ["categories"] },
+  bills: { title: "Bills & Subscriptions", description: "Manage upcoming bills and recurring costs.", sections: ["subscriptions"] },
+  goals: { title: "Goals & Savings", description: "Keep track of your goals and celebrate your progress.", sections: ["goals", "challenges"] },
+  insights: { title: "Insights & Reports", description: "Explore your spending patterns and reports.", sections: ["insights"] },
+  tools: { title: "Financial Tools", description: "Plan ahead with calculators, debt tracking and forecasts.", sections: ["debts", "forecast", "tools"] },
+  settings: { title: "Settings", description: "Personalise your dashboard and manage your data.", sections: ["data"] }
+};
+const DEFAULT_DASHBOARD_SECTIONS = ["summary", "plan", "activity"];
 function layoutState() {
   const ids = SECTIONS.map(([id]) => id);
   const order = (Array.isArray(layout.order) ? layout.order : []).filter((id) => ids.includes(id));
   ids.forEach((id) => { if (!order.includes(id)) order.push(id); });
-  const hidden = (Array.isArray(layout.hidden) ? layout.hidden : []).filter((id) => ids.includes(id));
+  const visible = Array.isArray(layout.dashboardVisible)
+    ? layout.dashboardVisible
+    : DEFAULT_DASHBOARD_SECTIONS.filter((id) => !Array.isArray(layout.hidden) || !layout.hidden.includes(id));
+  const hidden = ids.filter((id) => !visible.includes(id));
   return { order, hidden };
 }
 function applyLayout() {
   const { order, hidden } = layoutState();
   document.querySelectorAll("[data-section]").forEach((node) => {
-    node.hidden = hidden.includes(node.dataset.section);
-    node.style.order = order.indexOf(node.dataset.section);
+    const id = node.dataset.section;
+    node.hidden = currentView === "dashboard" ? hidden.includes(id) : !VIEW_SECTIONS[currentView].sections.includes(id);
+    node.style.order = currentView === "dashboard" ? order.indexOf(id) : "";
+  });
+  document.querySelectorAll("[data-view-only]").forEach((node) => {
+    node.hidden = node.dataset.viewOnly !== currentView;
   });
 }
-function renderCustomize() {
-  const { order, hidden } = layoutState();
-  const names = Object.fromEntries(SECTIONS);
-  $("customize-list").innerHTML = order.map((id, i) => `<li>
-    <label><input type="checkbox" data-section-toggle="${id}" ${hidden.includes(id) ? "" : "checked"} /> ${esc(names[id])}</label>
-    <span class="transaction-actions">
-      <button class="mini-btn" type="button" data-section-move="-1" data-id="${id}" ${i === 0 ? "disabled" : ""} aria-label="Move ${esc(names[id])} up">Up</button>
-      <button class="mini-btn" type="button" data-section-move="1" data-id="${id}" ${i === order.length - 1 ? "disabled" : ""} aria-label="Move ${esc(names[id])} down">Down</button>
-    </span></li>`).join("");
-}
-function saveLayout(next) {
-  layout = next;
-  save(KEYS.layout, layout);
-  applyLayout();
-  renderCustomize();
-}
-$("customize-btn")?.addEventListener("click", () => { renderCustomize(); openModal("customize-modal"); });
-$("customize-reset")?.addEventListener("click", () => saveLayout({}));
-$("customize-list")?.addEventListener("change", (event) => {
-  const id = event.target.dataset.sectionToggle;
-  if (!id) return;
-  const { order, hidden } = layoutState();
-  saveLayout({ order, hidden: event.target.checked ? hidden.filter((x) => x !== id) : [...hidden, id] });
-});
-$("customize-list")?.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-section-move]");
-  if (!button) return;
-  const { order, hidden } = layoutState();
-  const from = order.indexOf(button.dataset.id);
-  const to = from + Number(button.dataset.sectionMove);
-  if (to < 0 || to >= order.length) return;
-  order.splice(to, 0, order.splice(from, 1)[0]);
-  saveLayout({ order, hidden });
-});
-applyLayout();
-
 /* Custom categories: add, rename, delete */
 function syncCategories() {
   transactions.forEach((t) => {
@@ -1446,7 +1438,7 @@ function buildNotifications() {
       if (days <= 7) list.push({ level: "info", text: `${debt.name} payment of ${money(Math.min(debt.minimum, debt.balance))} is due ${days === 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`}.` });
     });
   }
-  if (notifyOn("backup")) {
+    if (notifyOn("backup")) {
     const last = localStorage.getItem(KEYS.lastBackup);
     const age = last ? Math.floor((Date.now() - Date.parse(last)) / 86400000) : null;
     if (age === null) list.push({ level: "info", text: "You have not downloaded a backup yet. Your data only lives in this browser." });
@@ -1984,4 +1976,3 @@ if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
 }
 
 renderCategoryOptions();
-render();
