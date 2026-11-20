@@ -10,6 +10,7 @@ const KEYS = {
   categoryBudgets: "money-dashboard-category-budgets",
   goals: "money-dashboard-goals",
   subscriptions: "money-dashboard-subscriptions",
+  recurringIncome: "money-dashboard-recurring-income",
   debts: "money-dashboard-debts",
   debtPlan: "money-dashboard-debt-plan",
   layout: "money-dashboard-layout",
@@ -18,6 +19,7 @@ const KEYS = {
   lastBackup: "money-dashboard-last-backup",
   period: "money-dashboard-period",
   seeded: "money-dashboard-seeded",
+  onboarding: "money-dashboard-onboarding",
   theme: "money-dashboard-theme"
 };
 
@@ -87,8 +89,15 @@ function saveTransactions() { save(KEYS.transactions, transactions); }
 function saveBills() { save(KEYS.bills, bills); }
 function savePlan() { save(KEYS.allocations, allocations); }
 function validAmount(value, allowZero = false) {
+  if (value === null || value === undefined || (typeof value === "string" && !value.trim())) return null;
   const amount = Number(value);
   return Number.isFinite(amount) && (allowZero ? amount >= 0 : amount > 0) ? amount : null;
+}
+function inputAmount(value, allowZero = false) {
+  const amount = validAmount(value, allowZero);
+  if (amount === null) return null;
+  const cents = amount * 100;
+  return Number.isSafeInteger(Math.round(cents)) && Math.abs(cents - Math.round(cents)) < 1e-7 ? amount : null;
 }
 
 function cleanTransaction(item) {
@@ -117,6 +126,11 @@ function cleanBill(item) {
   };
 }
 
+const onboardingState = localStorage.getItem(KEYS.onboarding);
+const hasExistingData = Object.values(KEYS).some((key) => key !== KEYS.onboarding && localStorage.getItem(key) !== null);
+let needsOnboarding = onboardingState === "pending" || (!onboardingState && !hasExistingData);
+if (needsOnboarding && $("welcome-modal")) localStorage.setItem(KEYS.onboarding, "pending");
+
 let transactions = (Array.isArray(load(KEYS.transactions, []))
   ? load(KEYS.transactions, []).map(cleanTransaction).filter(Boolean) : []);
 let bills = (Array.isArray(load(KEYS.bills, null))
@@ -126,6 +140,7 @@ let categories = load(KEYS.categories, ["Bills", "Eating out", "Groceries", "Inc
 let categoryBudgets = load(KEYS.categoryBudgets, []);
 let goals = load(KEYS.goals, []);
 let subscriptions = load(KEYS.subscriptions, []);
+let recurringIncome = load(KEYS.recurringIncome, []);
 let debts = load(KEYS.debts, []);
 let debtPlan = load(KEYS.debtPlan, {});
 let chartMode = "bars";
@@ -149,35 +164,12 @@ if (!Array.isArray(categories)) categories = [];
 if (!Array.isArray(categoryBudgets)) categoryBudgets = [];
 if (!Array.isArray(goals)) goals = [];
 if (!Array.isArray(subscriptions)) subscriptions = [];
+if (!Array.isArray(recurringIncome)) recurringIncome = [];
 for (const key of ["challenges", "layout", "notifyPrefs"]) {
   const value = { challenges, layout, notifyPrefs }[key];
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     if (key === "challenges") challenges = {}; else if (key === "layout") layout = {}; else notifyPrefs = {};
   }
-}
-
-if (localStorage.getItem(KEYS.seeded) === null) {
-  if (!transactions.length) {
-    const month = today().slice(0, 7);
-    const day = (n) => `${month}-${pad(Math.min(n, Number(today().slice(8, 10))))}`;
-    transactions = [
-      { id: uid(), type: "income", amount: 1200, description: "Monthly pay", category: "Income", date: day(1), notes: "" },
-      { id: uid(), type: "expense", amount: 42, description: "Groceries", category: "Groceries", date: day(3), notes: "" },
-      { id: uid(), type: "expense", amount: 20, description: "Bus pass", category: "Transport", date: day(5), notes: "" },
-      { id: uid(), type: "expense", amount: 8, description: "Coffee", category: "Eating out", date: day(5), notes: "" }
-    ];
-    saveTransactions();
-  }
-  localStorage.setItem(KEYS.seeded, "1");
-}
-if (!Array.isArray(load(KEYS.bills, null))) {
-  const m = today().slice(0, 7);
-  bills = [
-    { id: uid(), name: "Rent", amount: 400, due: `${m}-28`, recurring: true },
-    { id: uid(), name: "Phone", amount: 45, due: `${m}-20`, recurring: true },
-    { id: uid(), name: "Internet", amount: 60, due: `${m}-25`, recurring: true }
-  ];
-  saveBills();
 }
 function periodRange(type = periodType, anchor = periodAnchor) {
   if (type === "week") {
@@ -199,15 +191,15 @@ function stepPeriod(step) {
     : addDays(periodAnchor, step * (periodType === "week" ? 7 : 14));
   render();
 }
-function rangeTransactions(range = periodRange()) {
-  return transactions.filter((item) => item.date >= range.start && item.date <= range.end);
+function rangeTransactions(range = periodRange(), source = transactions) {
+  return source.filter((item) => item.date >= range.start && item.date <= range.end);
 }
 function labelPeriod(range) {
   if (periodType === "month") return formatDate(range.start, { month: "long", year: "numeric" });
   return `${formatDate(range.start, { day: "numeric", month: "short" })} – ${formatDate(range.end, { day: "numeric", month: "short", year: "numeric" })}`;
 }
 
-function billOccurrences(range) {
+function billOccurrences(range, source = transactions) {
   const result = [];
   bills.forEach((bill) => {
     const dueDates = [];
@@ -226,23 +218,37 @@ function billOccurrences(range) {
       }
     }
     dueDates.filter((date) => date >= range.start && date <= range.end).forEach((date) => {
-      const payment = transactions.find((item) => item.billId === bill.id && item.billDue === date);
+      const payment = source.find((item) => item.type === "expense" && item.billId === bill.id && item.billDue === date);
       result.push({ bill, date, paid: Boolean(payment) });
     });
   });
   return result.sort((a, b) => a.date.localeCompare(b.date));
 }
 
-function periodTotals() {
+function periodTotals(source = transactions) {
   const range = periodRange();
-  const items = rangeTransactions(range);
+  const items = rangeTransactions(range, source);
   const factor = FACTORS[periodType];
   const spent = items.filter((t) => t.type === "expense").reduce((sum, t) => sum + t.amount, 0);
   const income = items.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
-  const reserved = allocations.filter((a) => a.type !== "bill")
-    .reduce((sum, a) => sum + Number(a.amount || 0), 0) * factor;
-  const unpaidBills = billOccurrences(range).filter((b) => !b.paid)
+  const unpaidBills = billOccurrences(range, source).filter((b) => !b.paid)
     .reduce((sum, b) => sum + b.bill.amount, 0);
+  const flexibleCategories = new Map();
+  let reserved = 0;
+  allocations.filter((a) => a.type !== "bill").forEach((a) => {
+    const amount = Number(a.amount || 0) * factor;
+    if (a.type === "flexible" && typeof a.category === "string" && a.category.trim()) {
+      const category = a.category.trim().toLowerCase();
+      flexibleCategories.set(category, (flexibleCategories.get(category) || 0) + amount);
+    } else {
+      reserved += amount;
+    }
+  });
+  flexibleCategories.forEach((amount, category) => {
+    const categorySpent = items.filter((t) => t.type === "expense" && t.category.trim().toLowerCase() === category)
+      .reduce((sum, t) => sum + t.amount, 0);
+    reserved += Math.max(0, amount - categorySpent - (category === "bills" ? unpaidBills : 0));
+  });
   const budget = monthlyBudget * factor;
   const remaining = budget - spent;
   return {
@@ -285,8 +291,10 @@ function renderSafeToSpend(t) {
   }
   const first = now > range.start ? now : range.start;
   const days = daysBetween(first, range.end) + 1;
-  const spentToday = transactions.filter((x) => x.type === "expense" && x.date === now).reduce((sum, x) => sum + x.amount, 0);
-  const pool = t.available + (now >= range.start ? spentToday : 0);
+  const pool = now >= range.start
+    ? periodTotals(transactions.filter((x) => x.type !== "expense" || x.date !== now)).available
+    : t.available;
+  const spentToday = pool - t.available;
   if (pool <= 0) {
     strong.textContent = money(0);
     $("safe-note").textContent = "Nothing left to assign this period";
@@ -301,7 +309,7 @@ function renderAllocations() {
   const list = $("allocation-list");
   if (list) {
     list.innerHTML = allocations.length ? allocations.map((a) => `
-      <li><span>${esc(a.name)} <small>${esc(a.type || "savings")}</small></span>
+      <li><span>${esc(a.name)} <small>${esc(a.type || "savings")}${a.type === "flexible" && a.category ? ` · ${esc(a.category)}` : ""}${a.type === "bill" ? ` · ${esc(bills.find((bill) => bill.id === a.billId)?.name || "Unlinked: edit to choose a bill")}` : ""}</small></span>
       <strong>${money(a.amount)}</strong>
       <span class="transaction-actions">
         <button class="mini-btn edit-allocation" data-id="${esc(a.id)}" type="button">Edit</button>
@@ -318,7 +326,7 @@ function renderBills() {
   const items = billOccurrences(periodRange());
   const content = items.length ? items.map(({ bill, date, paid }) => `
     <li class="${paid ? "is-paid" : ""}">
-      <span class="bill-name">${esc(bill.name)}<time datetime="${date}">${formatDate(date, { day: "numeric", month: "short" })}${bill.recurring ? " · monthly" : ""}</time></span>
+      <span class="bill-name">${esc(bill.name)}<time datetime="${date}">${formatDate(date, { day: "numeric", month: "short" })}${bill.recurring ? " · monthly" : ""}</time>${allocations.some((a) => a.type === "bill" && a.billId === bill.id) ? `<small>Monthly allocation: ${money(allocations.filter((a) => a.type === "bill" && a.billId === bill.id).reduce((sum, a) => sum + Number(a.amount), 0))} / ${money(bill.amount)}</small>` : ""}</span>
       <strong>${money(bill.amount)}</strong>
       <span class="bill-actions">
         <button class="mini-btn pay-bill" data-id="${esc(bill.id)}" data-date="${date}" type="button">${paid ? "Undo" : "Mark paid"}</button>
@@ -349,7 +357,8 @@ function renderTransactions() {
   }
 
   const container = $("spending-by-date-list");
-  if (container) {    const groups = {};
+  if (container) {
+    const groups = {};
     rangeTransactions().filter((t) => t.type === "expense").forEach((t) => {
       groups[t.date] = (groups[t.date] || 0) + t.amount;
     });
@@ -420,6 +429,7 @@ function renderCategoryBudgets() {
     </article>`;
   }).join("");
 }
+
 /* Savings goals */
 const MILESTONES = [25, 50, 75, 100];
 function goalDetails(goal) {
@@ -599,6 +609,7 @@ function render() {
   renderCategoryBudgets();
   renderGoals();
   renderSubscriptions();
+  renderRecurringIncome();
   renderDebts();
   renderForecast();
   renderInsights();
@@ -608,11 +619,22 @@ function render() {
 }
 
 /* Modal helpers */
+const modalReturnFocus = new WeakMap();
 function openModal(id) {
-  $(id)?.classList.remove("hidden");
-  $(id)?.querySelector("input:not([type=hidden]), select")?.focus();
+  const modal = $(id);
+  if (!modal) return;
+  if (modal.classList.contains("hidden")) modalReturnFocus.set(modal, document.activeElement);
+  modal.classList.remove("hidden");
+  (modal.querySelector("input:not([type=hidden]), select") || modal.querySelector("button"))?.focus();
 }
-function closeModal(id) { $(id)?.classList.add("hidden"); }
+function closeModal(id) {
+  const modal = $(id);
+  if (!modal) return;
+  modal.classList.add("hidden");
+  const trigger = modalReturnFocus.get(modal);
+  modalReturnFocus.delete(modal);
+  if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus();
+}
 function formError(id, message) { if ($(id)) $(id).textContent = message; }
 
 document.addEventListener("click", (event) => {
@@ -620,10 +642,33 @@ document.addEventListener("click", (event) => {
   if (close) closeModal(close.dataset.close);
 });
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") document.querySelectorAll(".modal:not(.hidden)").forEach((m) => m.classList.add("hidden"));
+  const modal = [...document.querySelectorAll(".modal:not(.hidden)")].at(-1);
+  if (!modal) return;
+  if (event.key === "Escape") {
+    if (modal.id === "welcome-modal" && needsOnboarding) return;
+    closeModal(modal.id);
+    return;
+  }
+  if (event.key !== "Tab") return;
+  const focusable = [...modal.querySelectorAll(
+    'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  )].filter((element) => element.getClientRects().length > 0);
+  if (!focusable.length) {
+    event.preventDefault();
+    return;
+  }
+  const first = focusable[0];
+  const last = focusable.at(-1);
+  if (event.shiftKey && (document.activeElement === first || !modal.contains(document.activeElement))) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && (document.activeElement === last || !modal.contains(document.activeElement))) {
+    event.preventDefault();
+    first.focus();
+  }
 });
 document.querySelectorAll(".modal").forEach((modal) => modal.addEventListener("click", (event) => {
-  if (event.target === modal) modal.classList.add("hidden");
+  if (event.target === modal && !(modal.id === "welcome-modal" && needsOnboarding)) closeModal(modal.id);
 }));
 
 /* Transactions */
@@ -651,17 +696,18 @@ txForm?.addEventListener("submit", (event) => {
   const item = {
     id: id || uid(),
     type: String(data.get("type")),
-    amount: validAmount(data.get("amount")),
+    amount: inputAmount(data.get("amount")),
     description: String(data.get("description") || "").trim(),
     category: String(data.get("category") || "").trim(),
     date: String(data.get("date") || ""),
     notes: String(data.get("notes") || "")
   };
   if (!item.amount || !item.description || !item.category || !validDate(item.date)) {
-    formError("transaction-form-error", "Enter a description, category, valid date and amount greater than zero.");
+    formError("transaction-form-error", "Enter a description, category, valid date and positive amount with at most two decimal places.");
     return;
   }
   const old = transactions.find((t) => t.id === id);
+  if (old?.billId && item.type !== "expense") return formError("transaction-form-error", "Bill payments must remain expenses. Undo the bill payment or delete the transaction instead.");
   if (old?.billId) Object.assign(item, { billId: old.billId, billDue: old.billDue });
   transactions = id ? transactions.map((t) => t.id === id ? item : t) : [...transactions, item];
   rememberCategory(item.category);
@@ -688,18 +734,29 @@ $("edit-budget-btn")?.addEventListener("click", () => {
 $("edit-budget-money-btn")?.addEventListener("click", () => $("edit-budget-btn").click());
 $("budget-form")?.addEventListener("submit", (event) => {
   event.preventDefault();
-  const value = validAmount($("budget-input").value, true);
-  if (value === null) return formError("budget-form-error", "Enter a valid budget of zero or more.");
+  const value = inputAmount($("budget-input").value, true);
+  if (value === null) return formError("budget-form-error", "Enter a budget of zero or more with at most two decimal places.");
   monthlyBudget = value;
   save(KEYS.budget, monthlyBudget);
   render();
   closeModal("budget-modal");
 });
-
 /* Money plan */
-$("plan-amount-btn")?.addEventListener("click", () => {  $("allocation-form").reset();
+function updateAllocationCategory() {
+  $("allocation-category-label").hidden = $("allocation-type").value !== "flexible";
+  $("allocation-bill-label").hidden = $("allocation-type").value !== "bill";
+  const select = $("allocation-bill");
+  const selected = select.value;
+  select.innerHTML = `<option value="">Choose a bill</option>` + bills.map((bill) => `<option value="${esc(bill.id)}">${esc(bill.name)}</option>`).join("");
+  select.value = bills.some((bill) => bill.id === selected) ? selected : "";
+}
+$("allocation-type")?.addEventListener("change", updateAllocationCategory);
+$("plan-amount-btn")?.addEventListener("click", () => {
+  $("allocation-form").reset();
   $("allocation-id").value = "";
   $("allocation-submit-btn").textContent = "Add";
+  formError("allocation-form-error", "");
+  updateAllocationCategory();
   renderAllocations();
   openModal("plan-modal");
 });
@@ -708,14 +765,22 @@ $("allocation-form")?.addEventListener("submit", (event) => {
   const id = $("allocation-id").value;
   const name = $("planned-note").value.trim();
   const type = $("allocation-type").value;
-  const amount = validAmount($("planned-amount").value);
-  if (!name || !amount) return formError("allocation-form-error", "Enter a name and amount greater than zero.");
-  const item = { id: id || uid(), name, type, amount };
+  const amount = inputAmount($("planned-amount").value);
+  if (!name || !amount) return formError("allocation-form-error", "Enter a name and positive amount with at most two decimal places.");
+  const enteredCategory = $("allocation-category").value.trim();
+  if (type === "flexible" && !enteredCategory) return formError("allocation-form-error", "Enter a spending category for the flexible allocation.");
+  const billId = $("allocation-bill").value;
+  if (type === "bill" && !bills.some((bill) => bill.id === billId)) return formError("allocation-form-error", "Choose an existing bill for this allocation.");
+  const category = categories.find((c) => c.toLowerCase() === enteredCategory.toLowerCase()) || enteredCategory;
+  if (type === "flexible") rememberCategory(category);
+  const item = { id: id || uid(), name, type, amount, ...(type === "flexible" ? { category } : {}), ...(type === "bill" ? { billId } : {}) };
   allocations = id ? allocations.map((a) => a.id === id ? item : a) : [...allocations, item];
   savePlan();
   $("allocation-form").reset();
   $("allocation-id").value = "";
   $("allocation-submit-btn").textContent = "Add";
+  formError("allocation-form-error", "");
+  updateAllocationCategory();
   render();
 });
 function editAllocation(id) {
@@ -724,8 +789,12 @@ function editAllocation(id) {
   $("allocation-id").value = a.id;
   $("planned-note").value = a.name;
   $("allocation-type").value = a.type || "savings";
+  $("allocation-category").value = a.category || "";
   $("planned-amount").value = a.amount;
   $("allocation-submit-btn").textContent = "Update";
+  formError("allocation-form-error", "");
+  updateAllocationCategory();
+  $("allocation-bill").value = a.billId || "";
 }
 
 /* Bills: paid status is represented by a matching expense transaction */
@@ -755,9 +824,9 @@ billForm?.addEventListener("submit", (event) => {
   event.preventDefault();
   const id = billForm.elements.id.value;
   const name = billForm.elements.name.value.trim();
-  const amount = validAmount(billForm.elements.amount.value);
+  const amount = inputAmount(billForm.elements.amount.value);
   const due = billForm.elements.due.value;
-  if (!name || !amount || !validDate(due)) return formError("bill-form-error", "Enter a bill name, valid due date and amount.");
+  if (!name || !amount || !validDate(due)) return formError("bill-form-error", "Enter a bill name, valid due date and positive amount with at most two decimal places.");
   const bill = { id: id || uid(), name, amount, due, recurring: billForm.elements.recurring.checked };
   bills = id ? bills.map((b) => b.id === id ? bill : b) : [...bills, bill];
   saveBills();
@@ -765,8 +834,9 @@ billForm?.addEventListener("submit", (event) => {
   closeModal("bill-modal");
 });
 function markBill(id, date) {
-  const payment = transactions.find((t) => t.billId === id && t.billDue === date);
+  const payment = transactions.find((t) => t.type === "expense" && t.billId === id && t.billDue === date);
   if (payment) {
+    if (!confirm("Undo this bill payment? Its linked expense transaction will be deleted.")) return;
     transactions = transactions.filter((t) => t !== payment);
   } else {
     const b = bills.find((x) => x.id === id);
@@ -793,8 +863,8 @@ $("category-budget-form")?.addEventListener("submit", (event) => {
   event.preventDefault();
   const id = $("category-budget-id").value;
   const category = $("category-budget-name").value.trim();
-  const limit = validAmount($("category-budget-limit").value);
-  if (!category || !limit) return formError("category-budget-error", "Enter a category and a limit greater than zero.");
+  const limit = inputAmount($("category-budget-limit").value);
+  if (!category || !limit) return formError("category-budget-error", "Enter a category and a positive limit with at most two decimal places.");
   rememberCategory(category);
   const item = { id: id || uid(), category, limit };
   categoryBudgets = id ? categoryBudgets.map((b) => b.id === id ? item : b) : [...categoryBudgets, item];
@@ -807,7 +877,6 @@ function deleteCategoryBudget(id) {
   save(KEYS.categoryBudgets, categoryBudgets);
   render();
 }
-
 /* Savings goals */
 function openGoal(id = "") {
   const goal = goals.find((g) => g.id === id);
@@ -825,9 +894,9 @@ $("goal-form")?.addEventListener("submit", (event) => {
   event.preventDefault();
   const id = $("goal-id").value;
   const name = $("goal-name").value.trim();
-  const target = validAmount($("goal-target").value);
-  const savedAmount = validAmount($("goal-saved").value, true);
-  if (!name || !target || savedAmount === null) return formError("goal-form-error", "Enter a name, a target and a saved amount of zero or more.");
+  const target = inputAmount($("goal-target").value);
+  const savedAmount = inputAmount($("goal-saved").value, true);
+  if (!name || !target || savedAmount === null) return formError("goal-form-error", "Enter a name, positive target and saved amount of zero or more; use at most two decimal places.");
   const deadline = $("goal-deadline").value;
   if (deadline && !validDate(deadline)) return formError("goal-form-error", "Enter a valid target date or leave it empty.");
   const goal = { id: id || uid(), name, target, saved: savedAmount, ...(deadline ? { deadline } : {}) };
@@ -842,7 +911,6 @@ function deleteGoal(id) {
   save(KEYS.goals, goals);
   render();
 }
-
 /* Delegated actions for rendered rows */
 document.addEventListener("click", (event) => {
   const button = event.target.closest("button");
@@ -853,13 +921,14 @@ document.addEventListener("click", (event) => {
   else if (button.matches(".pay-bill")) markBill(id, date);
   else if (button.matches(".edit-bill")) editBill(id);
   else if (button.matches(".delete-bill")) {
-    if (confirm("Delete this bill? Previous recorded payments remain in transaction history.")) {
+    if (confirm("Delete this bill? Previous recorded payments remain in transaction history. Linked allocations will need to be assigned to another bill.")) {
       bills = bills.filter((b) => b.id !== id);
       saveBills();
       render();
     }
   } else if (button.matches(".edit-allocation")) editAllocation(id);
   else if (button.matches(".delete-allocation")) {
+    if (!confirm("Delete this allocation?")) return;
     allocations = allocations.filter((a) => a.id !== id);
     savePlan();
     render();
@@ -882,6 +951,7 @@ $("history-clear")?.addEventListener("click", () => {
   if ($("history-sort")) $("history-sort").value = "newest";
   renderHistory();
 });
+
 /* Navigation */
 function view(name) {
   const aliases = { overview: "dashboard", transactions: "money", earnings: "money", budget: "money", saver: "goals", subscriptions: "bills", challenges: "goals" };
@@ -921,11 +991,194 @@ $("period-type")?.addEventListener("change", (event) => {
 $("period-prev")?.addEventListener("click", () => stepPeriod(-1));
 $("period-next")?.addEventListener("click", () => stepPeriod(1));
 
+function startDashboard(sample) {
+  if (!needsOnboarding || localStorage.getItem(KEYS.onboarding) !== "pending") {
+    formError("welcome-error", "Your dashboard was already started in another tab. Refresh this page to continue.");
+    return;
+  }
+  const month = today().slice(0, 7);
+  const day = (n) => `${month}-${pad(Math.min(n, Number(today().slice(8, 10))))}`;
+  const initialTransactions = sample ? [
+    { id: uid(), type: "income", amount: 1200, description: "Monthly pay", category: "Income", date: day(1), notes: "" },
+    { id: uid(), type: "expense", amount: 42, description: "Groceries", category: "Groceries", date: day(3), notes: "" },
+    { id: uid(), type: "expense", amount: 20, description: "Bus pass", category: "Transport", date: day(5), notes: "" },
+    { id: uid(), type: "expense", amount: 8, description: "Coffee", category: "Eating out", date: day(5), notes: "" }
+  ] : [];
+  const initialBills = sample ? [
+    { id: uid(), name: "Rent", amount: 400, due: `${month}-28`, recurring: true },
+    { id: uid(), name: "Phone", amount: 45, due: `${month}-20`, recurring: true },
+    { id: uid(), name: "Internet", amount: 60, due: `${month}-25`, recurring: true }
+  ] : [];
+  const initialBudget = sample ? DEFAULT_BUDGET : 0;
+  try {
+    localStorage.setItem(KEYS.transactions, JSON.stringify(initialTransactions));
+    localStorage.setItem(KEYS.bills, JSON.stringify(initialBills));
+    localStorage.setItem(KEYS.allocations, JSON.stringify([]));
+    localStorage.setItem(KEYS.budget, JSON.stringify(initialBudget));
+    localStorage.setItem(KEYS.seeded, "1");
+    localStorage.setItem(KEYS.onboarding, "complete");
+  } catch (error) {
+    console.error("Could not start dashboard:", error);
+    formError("welcome-error", "Could not save your choice. Check your browser storage and try again.");
+    return;
+  }
+  transactions = initialTransactions;
+  bills = initialBills;
+  allocations = [];
+  monthlyBudget = initialBudget;
+  needsOnboarding = false;
+  closeModal("welcome-modal");
+  render();
+}
+$("start-sample-btn")?.addEventListener("click", () => startDashboard(true));
+$("start-blank-btn")?.addEventListener("click", () => startDashboard(false));
+$("clear-data-btn")?.addEventListener("click", () => {
+  if (!confirm("Clear all Money Planner data and settings from this browser? This cannot be undone. Download a backup first if you want to keep it.")) return;
+  try {
+    Object.values(KEYS).forEach((key) => localStorage.removeItem(key));
+    location.reload();
+  } catch (error) {
+    console.error("Could not clear app data:", error);
+    showMessage("backup-message", "Could not clear all app data. Check your browser storage and try again.");
+  }
+});
+/* Delegated actions for rendered rows */
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (!button) return;
+  const { id, date } = button.dataset;
+  if (button.matches(".edit-transaction")) editTransaction(id);
+  else if (button.matches(".delete-transaction")) deleteTransaction(id);
+  else if (button.matches(".pay-bill")) markBill(id, date);
+  else if (button.matches(".edit-bill")) editBill(id);
+  else if (button.matches(".delete-bill")) {
+    if (confirm("Delete this bill? Previous recorded payments remain in transaction history. Linked allocations will need to be assigned to another bill.")) {
+      bills = bills.filter((b) => b.id !== id);
+      saveBills();
+      render();
+    }
+  } else if (button.matches(".edit-allocation")) editAllocation(id);
+  else if (button.matches(".delete-allocation")) {
+    if (!confirm("Delete this allocation?")) return;
+    allocations = allocations.filter((a) => a.id !== id);
+    savePlan();
+    render();
+  } else if (button.matches(".edit-category-budget")) openCategoryBudget(id);
+  else if (button.matches(".delete-category-budget")) deleteCategoryBudget(id);
+  else if (button.matches(".edit-goal")) openGoal(id);
+  else if (button.matches(".delete-goal")) deleteGoal(id);
+});
+
+/* History filters */
+["history-search", "history-type", "history-category", "history-from", "history-to", "history-sort"]
+  .forEach((id) => {
+    $(id)?.addEventListener("input", renderHistory);
+    $(id)?.addEventListener("change", renderHistory);
+  });
+$("history-clear")?.addEventListener("click", () => {
+  ["history-search", "history-from", "history-to"].forEach((id) => { if ($(id)) $(id).value = ""; });
+  if ($("history-type")) $("history-type").value = "all";
+  if ($("history-category")) $("history-category").value = "all";
+  if ($("history-sort")) $("history-sort").value = "newest";
+  renderHistory();
+});
+
+/* Navigation */
+function view(name) {
+  const aliases = { overview: "dashboard", transactions: "money", earnings: "money", budget: "money", saver: "goals", subscriptions: "bills", challenges: "goals" };
+  const target = aliases[name] || name;
+  if (!VIEW_SECTIONS[target]) return;
+  currentView = target;
+  $("history-view").hidden = target !== "money";
+  if (target === "money") $("history-type").value = name === "earnings" ? "income" : "all";
+  $("view-title").textContent = VIEW_SECTIONS[target].title;
+  $("view-description").textContent = VIEW_SECTIONS[target].description;
+  applyLayout();
+  document.querySelectorAll(".nav-item").forEach((item) => {
+    const active = item.dataset.nav === target;
+    item.classList.toggle("active", active);
+    if (active) item.setAttribute("aria-current", "page");
+    else item.removeAttribute("aria-current");
+  });
+  renderHistory();
+  $("view-title").focus({ preventScroll: true });
+  window.scrollTo({ top: 0 });
+}
+document.querySelectorAll("[data-nav]").forEach((link) => link.addEventListener("click", (event) => {
+  event.preventDefault();
+  view(link.dataset.nav);
+  if (link.dataset.type) {
+    $("history-type").value = link.dataset.type;
+    renderHistory();
+  }
+  if (link.dataset.nav === "transactions") $("history-view").scrollIntoView({ behavior: "smooth" });
+}));
+$("period-type")?.addEventListener("change", (event) => {
+  periodType = event.target.value;
+  periodAnchor = today();
+  save(KEYS.period, periodType);
+  render();
+});
+$("period-prev")?.addEventListener("click", () => stepPeriod(-1));
+$("period-next")?.addEventListener("click", () => stepPeriod(1));
+
+function startDashboard(sample) {
+  if (!needsOnboarding || localStorage.getItem(KEYS.onboarding) !== "pending") {
+    formError("welcome-error", "Your dashboard was already started in another tab. Refresh this page to continue.");
+    return;
+  }
+  const month = today().slice(0, 7);
+  const day = (n) => `${month}-${pad(Math.min(n, Number(today().slice(8, 10))))}`;
+  const initialTransactions = sample ? [
+    { id: uid(), type: "income", amount: 1200, description: "Monthly pay", category: "Income", date: day(1), notes: "" },
+    { id: uid(), type: "expense", amount: 42, description: "Groceries", category: "Groceries", date: day(3), notes: "" },
+    { id: uid(), type: "expense", amount: 20, description: "Bus pass", category: "Transport", date: day(5), notes: "" },
+    { id: uid(), type: "expense", amount: 8, description: "Coffee", category: "Eating out", date: day(5), notes: "" }
+  ] : [];
+  const initialBills = sample ? [
+    { id: uid(), name: "Rent", amount: 400, due: `${month}-28`, recurring: true },
+    { id: uid(), name: "Phone", amount: 45, due: `${month}-20`, recurring: true },
+    { id: uid(), name: "Internet", amount: 60, due: `${month}-25`, recurring: true }
+  ] : [];
+  const initialBudget = sample ? DEFAULT_BUDGET : 0;
+  try {
+    localStorage.setItem(KEYS.transactions, JSON.stringify(initialTransactions));
+    localStorage.setItem(KEYS.bills, JSON.stringify(initialBills));
+    localStorage.setItem(KEYS.allocations, JSON.stringify([]));
+    localStorage.setItem(KEYS.budget, JSON.stringify(initialBudget));
+    localStorage.setItem(KEYS.seeded, "1");
+    localStorage.setItem(KEYS.onboarding, "complete");
+  } catch (error) {
+    console.error("Could not start dashboard:", error);
+    formError("welcome-error", "Could not save your choice. Check your browser storage and try again.");
+    return;
+  }
+  transactions = initialTransactions;
+  bills = initialBills;
+  allocations = [];
+  monthlyBudget = initialBudget;
+  needsOnboarding = false;
+  closeModal("welcome-modal");
+  render();
+}
+$("start-sample-btn")?.addEventListener("click", () => startDashboard(true));
+$("start-blank-btn")?.addEventListener("click", () => startDashboard(false));
+$("clear-data-btn")?.addEventListener("click", () => {
+  if (!confirm("Clear all Money Planner data and settings from this browser? This cannot be undone. Download a backup first if you want to keep it.")) return;
+  try {
+    Object.values(KEYS).forEach((key) => localStorage.removeItem(key));
+    location.reload();
+  } catch (error) {
+    console.error("Could not clear app data:", error);
+    showMessage("backup-message", "Could not clear all app data. Check your browser storage and try again.");
+  }
+});
+/* Interactive insights */
 /* Backup and restore */
 $("export-data-btn")?.addEventListener("click", () => {
   const backup = {
     version: 1, exportedAt: new Date().toISOString(), transactions, bills, allocations,
-    monthlyBudget, categories, categoryBudgets, goals, subscriptions, debts, debtPlan, challenges, layout, notifyPrefs,
+    monthlyBudget, periodType, categories, categoryBudgets, goals, subscriptions, recurringIncome, debts, debtPlan, challenges, layout, notifyPrefs,
     theme: localStorage.getItem(KEYS.theme)
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
@@ -939,43 +1192,83 @@ $("export-data-btn")?.addEventListener("click", () => {
   showMessage("backup-message", "Backup downloaded.");
   render();
 });
+
 $("import-data-input")?.addEventListener("change", async (event) => {
   const file = event.target.files?.[0];
   if (!file) return;
   try {
     const data = JSON.parse(await file.text());
-    if (!data || !Array.isArray(data.transactions) || !Array.isArray(data.bills)) {
+    if (!data || typeof data !== "object" || !Array.isArray(data.transactions) || !Array.isArray(data.bills)) {
       throw new Error("This file is not a valid dashboard backup.");
     }
+    const checkedArray = (key, valid) => {
+      const entries = data[key] === undefined ? [] : data[key];
+      if (!Array.isArray(entries) || !entries.every(valid)) throw new Error(`Invalid ${key} in backup.`);
+      return entries;
+    };
+    const restoredTransactions = checkedArray("transactions", (item) => Boolean(cleanTransaction(item))).map(cleanTransaction);
+    const restoredBills = checkedArray("bills", (item) => Boolean(cleanBill(item))).map(cleanBill);
+    const restoredAllocations = checkedArray("allocations", (a) => a && typeof a.name === "string" && a.name.trim() && validAmount(a.amount) !== null && (!a.type || ["savings", "flexible", "bill"].includes(a.type)) && (a.category === undefined || typeof a.category === "string") && (a.billId === undefined || typeof a.billId === "string"));
+    const restoredCategories = checkedArray("categories", (category) => typeof category === "string" && Boolean(category.trim()));
+    const restoredCategoryBudgets = checkedArray("categoryBudgets", (b) => b && typeof b.category === "string" && b.category.trim() && validAmount(b.limit) !== null);
+    const restoredGoals = checkedArray("goals", (g) => g && typeof g.name === "string" && g.name.trim() && validAmount(g.target) !== null && validAmount(g.saved, true) !== null && (!g.deadline || validDate(g.deadline)));
+    const restoredSubscriptions = checkedArray("subscriptions", (item) => Boolean(cleanSubscription(item))).map(cleanSubscription);
+    const restoredIncome = checkedArray("recurringIncome", (item) => Boolean(cleanRecurringIncome(item))).map(cleanRecurringIncome);
+    const restoredDebts = checkedArray("debts", (item) => Boolean(cleanDebt(item))).map(cleanDebt);
+    if (data.monthlyBudget !== undefined && validAmount(data.monthlyBudget, true) === null) throw new Error("Invalid monthly budget in backup.");
+    if (data.periodType !== undefined && !Object.hasOwn(FACTORS, data.periodType)) throw new Error("Invalid planning period in backup.");
+    for (const key of ["challenges", "layout", "notifyPrefs", "debtPlan"]) {
+      if (data[key] !== undefined && (!data[key] || typeof data[key] !== "object" || Array.isArray(data[key]))) throw new Error(`Invalid ${key} in backup.`);
+    }
     if (!confirm("Restore this backup? It will replace the dashboard data in this browser.")) return;
-    transactions = data.transactions.map(cleanTransaction).filter(Boolean);
-    bills = data.bills.map(cleanBill).filter(Boolean);
-    allocations = Array.isArray(data.allocations) ? data.allocations : [];
-    categories = Array.isArray(data.categories) ? data.categories : [];
-    categoryBudgets = Array.isArray(data.categoryBudgets) ? data.categoryBudgets : [];
-    goals = Array.isArray(data.goals) ? data.goals : [];
-    subscriptions = Array.isArray(data.subscriptions) ? data.subscriptions.map(cleanSubscription).filter(Boolean) : [];
-    debts = Array.isArray(data.debts) ? data.debts.map(cleanDebt).filter(Boolean) : [];
-    debtPlan = {
+    const restoredDebtPlan = {
       strategy: ["avalanche", "snowball"].includes(data.debtPlan?.strategy) ? data.debtPlan.strategy : "avalanche",
       extra: validAmount(data.debtPlan?.extra, true) ?? 0
     };
-    save(KEYS.debts, debts); save(KEYS.debtPlan, debtPlan);
-    monthlyBudget = validAmount(data.monthlyBudget, true) ?? DEFAULT_BUDGET;
-    challenges = data.challenges && typeof data.challenges === "object" ? data.challenges : {};
-    layout = data.layout && typeof data.layout === "object" ? data.layout : {};
-    notifyPrefs = data.notifyPrefs && typeof data.notifyPrefs === "object" ? data.notifyPrefs : {};
-    save(KEYS.challenges, challenges); save(KEYS.layout, layout); save(KEYS.notifyPrefs, notifyPrefs);
+    const restoredBudget = validAmount(data.monthlyBudget, true) ?? DEFAULT_BUDGET;
+    const restoredPeriod = data.periodType || periodType;
+    const writes = [
+      [KEYS.transactions, restoredTransactions], [KEYS.bills, restoredBills], [KEYS.allocations, restoredAllocations],
+      [KEYS.categories, restoredCategories], [KEYS.categoryBudgets, restoredCategoryBudgets], [KEYS.goals, restoredGoals],
+      [KEYS.subscriptions, restoredSubscriptions], [KEYS.recurringIncome, restoredIncome], [KEYS.debts, restoredDebts],
+      [KEYS.debtPlan, restoredDebtPlan], [KEYS.budget, restoredBudget], [KEYS.period, restoredPeriod],
+      [KEYS.challenges, data.challenges || {}], [KEYS.layout, data.layout || {}], [KEYS.notifyPrefs, data.notifyPrefs || {}]
+    ].map(([key, value]) => [key, JSON.stringify(value)]);
+    if (THEMES.includes(data.theme)) writes.push([KEYS.theme, data.theme]);
+    const previous = writes.map(([key]) => [key, localStorage.getItem(key)]);
+    try {
+      writes.forEach(([key, value]) => localStorage.setItem(key, value));
+    } catch (error) {
+      try {
+        previous.forEach(([key, value]) => value === null ? localStorage.removeItem(key) : localStorage.setItem(key, value));
+      } catch (rollbackError) {
+        console.error("Could not roll back an incomplete restore:", rollbackError);
+        throw new Error("Storage failed and the previous data could not be fully restored. Reload and check your data.");
+      }
+      throw new Error("Storage failed; the previous data was restored.");
+    }
+    transactions = restoredTransactions;
+    bills = restoredBills;
+    allocations = restoredAllocations;
+    categories = restoredCategories;
+    categoryBudgets = restoredCategoryBudgets;
+    goals = restoredGoals;
+    subscriptions = restoredSubscriptions;
+    recurringIncome = restoredIncome;
+    debts = restoredDebts;
+    debtPlan = restoredDebtPlan;
+    monthlyBudget = restoredBudget;
+    periodType = restoredPeriod;
+    challenges = data.challenges || {};
+    layout = data.layout || {};
+    notifyPrefs = data.notifyPrefs || {};
     applyLayout();
-    saveTransactions(); saveBills(); savePlan();
-    save(KEYS.categories, categories); save(KEYS.categoryBudgets, categoryBudgets);
-    save(KEYS.goals, goals); save(KEYS.subscriptions, subscriptions); save(KEYS.budget, monthlyBudget);
     if (THEMES.includes(data.theme)) applyTheme(data.theme);
     render();
     showMessage("backup-message", "Backup restored.");
   } catch (error) {
     console.error("Could not restore backup:", error);
-    showMessage("backup-message", "Restore failed: choose a valid dashboard backup.");
+    showMessage("backup-message", `Restore failed: ${error.message}`);
   } finally {
     event.target.value = "";
   }
@@ -995,6 +1288,7 @@ document.querySelectorAll(".theme-option").forEach((button) => button.addEventLi
   closeModal("theme-modal");
 }));
 applyTheme(THEMES.includes(localStorage.getItem(KEYS.theme)) ? localStorage.getItem(KEYS.theme) : "theme-botanical-light");
+
 /* Subscriptions */
 const CYCLES = {
   monthly: { label: "Monthly", perMonth: 1 },
@@ -1005,7 +1299,7 @@ const CYCLES = {
 function cleanSubscription(item) {
   if (!item || !String(item.name || "").trim() || !validAmount(item.amount) ||
       !CYCLES[item.cycle] || !validDate(item.date)) return null;
-  return { id: String(item.id || uid()), name: String(item.name).trim(), amount: Number(item.amount), cycle: item.cycle, date: item.date };
+  return { id: String(item.id || uid()), name: String(item.name).trim(), amount: Number(item.amount), cycle: item.cycle, date: item.date, forecast: item.forecast === true };
 }
 subscriptions = subscriptions.map(cleanSubscription).filter(Boolean);
 function addMonthsKeepDay(date, months, day) {
@@ -1055,6 +1349,7 @@ function openSubscription(id = "") {
   $("subscription-amount").value = sub?.amount || "";
   $("subscription-cycle").value = sub?.cycle || "monthly";
   $("subscription-date").value = sub?.date || today();
+  $("subscription-forecast").checked = sub?.forecast === true;
   $("subscription-modal-title").textContent = sub ? "Edit subscription" : "Add subscription";
   formError("subscription-form-error", "");
   openModal("subscription-modal");
@@ -1063,9 +1358,10 @@ $("add-subscription-btn")?.addEventListener("click", () => openSubscription());
 $("subscription-form")?.addEventListener("submit", (event) => {
   event.preventDefault();
   const id = $("subscription-id").value;
+  if (inputAmount($("subscription-amount").value) === null) return formError("subscription-form-error", "Enter a positive cost with at most two decimal places.");
   const sub = cleanSubscription({
     id: id || uid(), name: $("subscription-name").value, amount: $("subscription-amount").value,
-    cycle: $("subscription-cycle").value, date: $("subscription-date").value
+    cycle: $("subscription-cycle").value, date: $("subscription-date").value, forecast: $("subscription-forecast").checked
   });
   if (!sub) return formError("subscription-form-error", "Enter a name, a cost above zero and a valid renewal date.");
   subscriptions = id ? subscriptions.map((x) => x.id === id ? sub : x) : [...subscriptions, sub];
@@ -1083,8 +1379,6 @@ document.addEventListener("click", (event) => {
     render();
   }
 });
-
-/* Interactive insights */
 document.addEventListener("click", (event) => {
   const mode = event.target.closest("[data-chart-mode]");
   if (mode) {
@@ -1193,7 +1487,6 @@ if ($("calc-type")) {
   $("calc-form").addEventListener("submit", (event) => event.preventDefault());
   renderCalculatorForm();
 }
-
 /* Dashboard customisation */
 const SECTIONS = [
   ["summary", "Summary cards"], ["plan", "Money plan and bills"], ["categories", "Category budgets"],
@@ -1303,9 +1596,10 @@ function renameCategory(oldName) {
   const finalName = clash || name;
   transactions = transactions.map((t) => t.category === oldName ? { ...t, category: finalName } : t);
   categoryBudgets = categoryBudgets.map((b) => b.category.toLowerCase() === oldName.toLowerCase() ? { ...b, category: finalName } : b);
+  allocations = allocations.map((a) => a.type === "flexible" && a.category?.toLowerCase() === oldName.toLowerCase() ? { ...a, category: finalName } : a);
   mergeCategoryBudgets();
   categories = [...new Set(categories.map((c) => c === oldName ? finalName : c))].sort((a, b) => a.localeCompare(b));
-  save(KEYS.categories, categories); save(KEYS.categoryBudgets, categoryBudgets); saveTransactions();
+  save(KEYS.categories, categories); save(KEYS.categoryBudgets, categoryBudgets); saveTransactions(); savePlan();
   renderCategoryManager();
   render();
 }
@@ -1314,8 +1608,9 @@ function deleteCategory(name) {
   if (!confirm(`Delete "${name}"? ${count} transaction${count === 1 ? "" : "s"} will move to "Other" and its budget will be removed.`)) return;
   transactions = transactions.map((t) => t.category === name ? { ...t, category: "Other" } : t);
   categoryBudgets = categoryBudgets.filter((b) => b.category.toLowerCase() !== name.toLowerCase());
+  allocations = allocations.map((a) => a.type === "flexible" && a.category?.toLowerCase() === name.toLowerCase() ? { ...a, category: "Other" } : a);
   categories = categories.filter((c) => c !== name);
-  save(KEYS.categories, categories); save(KEYS.categoryBudgets, categoryBudgets); saveTransactions();
+  save(KEYS.categories, categories); save(KEYS.categoryBudgets, categoryBudgets); saveTransactions(); savePlan();
   renderCategoryManager();
   render();
 }
@@ -1359,7 +1654,7 @@ const TEMPLATES = {
 };
 function templatePlan() {
   const template = TEMPLATES[$("template-type").value];
-  const income = validAmount($("template-income").value);
+  const income = inputAmount($("template-income").value);
   if (!template || !income) return null;
   const amount = (pct) => Math.round(income * pct) / 100;
   return {
@@ -1388,7 +1683,7 @@ $("templates-btn")?.addEventListener("click", () => {
 });
 $("template-apply")?.addEventListener("click", () => {
   const plan = templatePlan();
-  if (!plan) return formError("template-error", "Enter a monthly income above zero.");
+  if (!plan) return formError("template-error", "Enter a positive monthly income with at most two decimal places.");
   if (!confirm(`Apply the ${plan.template.name} template? Your monthly budget becomes ${money(plan.income)} and your category budgets will be replaced.`)) return;
   monthlyBudget = plan.income;
   save(KEYS.budget, monthlyBudget);
@@ -1421,7 +1716,6 @@ $("export-csv-btn")?.addEventListener("click", () => {
   URL.revokeObjectURL(url);
   showMessage("backup-message", `Exported ${transactions.length} transaction${transactions.length === 1 ? "" : "s"} to CSV.`);
 });
-
 /* Reminders and notification centre */
 const NOTIFY_TYPES = [
   ["bills", "Bill reminders and overdue bills"], ["subscriptions", "Subscription renewals"],
@@ -1472,7 +1766,7 @@ function buildNotifications() {
       if (days <= 7) list.push({ level: "info", text: `${debt.name} payment of ${money(Math.min(debt.minimum, debt.balance))} is due ${days === 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`}.` });
     });
   }
-    if (notifyOn("backup")) {
+  if (notifyOn("backup")) {
     const last = localStorage.getItem(KEYS.lastBackup);
     const age = last ? Math.floor((Date.now() - Date.parse(last)) / 86400000) : null;
     if (age === null) list.push({ level: "info", text: "You have not downloaded a backup yet. Your data only lives in this browser." });
@@ -1740,6 +2034,8 @@ $("debt-form")?.addEventListener("submit", (event) => {
   event.preventDefault();
   const id = $("debt-id").value;
   const old = debts.find((d) => d.id === id);
+  if (inputAmount($("debt-original").value) === null || inputAmount($("debt-balance").value, true) === null ||
+      inputAmount($("debt-minimum").value) === null) return formError("debt-form-error", "Enter valid balances and a minimum payment with at most two decimal places.");
   const debt = cleanDebt({
     id: id || uid(), name: $("debt-name").value, type: $("debt-type").value, original: $("debt-original").value,
     balance: $("debt-balance").value, rate: $("debt-rate").value, minimum: $("debt-minimum").value,
@@ -1757,16 +2053,19 @@ $("debt-strategy")?.addEventListener("change", () => {
   renderDebts();
 });
 $("debt-extra")?.addEventListener("input", () => {
-  debtPlan = { ...debtPlan, extra: validAmount($("debt-extra").value, true) ?? 0 };
+  const amount = inputAmount($("debt-extra").value, true);
+  if (amount === null) return formError("debt-extra-error", "Enter zero or more with at most two decimal places.");
+  formError("debt-extra-error", "");
+  debtPlan = { ...debtPlan, extra: amount };
   save(KEYS.debtPlan, debtPlan);
   renderDebts();
 });
 $("debt-pay-form")?.addEventListener("submit", (event) => {
   event.preventDefault();
   const debt = debts.find((d) => d.id === $("debt-pay-id").value);
-  const amount = validAmount($("debt-pay-amount").value);
+  const amount = inputAmount($("debt-pay-amount").value);
   const date = $("debt-pay-date").value;
-  if (!debt || amount === null || !validDate(date)) return formError("debt-pay-error", "Enter a payment above zero and a valid date.");
+  if (!debt || amount === null || !validDate(date)) return formError("debt-pay-error", "Enter a positive payment with at most two decimal places and a valid date.");
   if (amount > debt.balance) return formError("debt-pay-error", `Payment cannot exceed the current balance of ${money(debt.balance)}.`);
   const applied = amount;
   debts = debts.map((d) => d.id === debt.id ? { ...d, balance: Math.round((d.balance - applied) * 100) / 100, payments: [...d.payments, { date, amount: applied }] } : d);
@@ -1808,8 +2107,83 @@ document.addEventListener("click", (event) => {
 });
 
 /* Financial forecasting */
+function cleanRecurringIncome(item) {
+  if (!item || !String(item.name || "").trim() || !validAmount(item.amount) ||
+      !CYCLES[item.cycle] || !validDate(item.date)) return null;
+  return { id: String(item.id || uid()), name: String(item.name).trim(), amount: Number(item.amount), cycle: item.cycle, date: item.date };
+}
+recurringIncome = recurringIncome.map(cleanRecurringIncome).filter(Boolean);
+
+function recurrenceDates(item, range) {
+  const dates = [];
+  if (item.date > range.end) return dates;
+  if (item.cycle === "weekly" || item.cycle === "fortnightly") {
+    const step = item.cycle === "weekly" ? 7 : 14;
+    let offset = Math.max(0, Math.ceil(daysBetween(item.date, range.start) / step));
+    for (let date = addDays(item.date, offset * step); date <= range.end; date = addDays(item.date, ++offset * step)) dates.push(date);
+  } else {
+    const step = item.cycle === "yearly" ? 12 : 1;
+    const delta = (Number(range.start.slice(0, 4)) - Number(item.date.slice(0, 4))) * 12
+      + Number(range.start.slice(5, 7)) - Number(item.date.slice(5, 7));
+    let offset = Math.max(0, Math.floor(delta / step));
+    const day = Number(item.date.slice(8, 10));
+    for (let date = addMonthsKeepDay(item.date, offset * step, day); date <= range.end; date = addMonthsKeepDay(item.date, ++offset * step, day)) {
+      if (date >= range.start) dates.push(date);
+    }
+  }
+  return dates;
+}
+function renderRecurringIncome() {
+  const list = $("recurring-income-list");
+  if (!list) return;
+  list.innerHTML = recurringIncome.length ? recurringIncome.map((item) => `<li>
+    <span class="bill-name">${esc(item.name)}<time datetime="${item.date}">${esc(CYCLES[item.cycle].label)} from ${esc(formatDate(item.date, { day: "numeric", month: "short", year: "numeric" }))}</time></span>
+    <strong>${money(item.amount)}</strong>
+    <span class="bill-actions">
+      <button class="mini-btn edit-recurring-income" data-id="${esc(item.id)}" type="button">Edit</button>
+      <button class="mini-btn delete-recurring-income" data-id="${esc(item.id)}" type="button">Delete</button>
+    </span></li>`).join("") : `<li class="empty-state">No recurring income schedules yet.</li>`;
+}
+function openRecurringIncome(id = "") {
+  const item = recurringIncome.find((entry) => entry.id === id);
+  $("recurring-income-form").reset();
+  $("recurring-income-id").value = item?.id || "";
+  $("recurring-income-name").value = item?.name || "";
+  $("recurring-income-amount").value = item?.amount || "";
+  $("recurring-income-cycle").value = item?.cycle || "monthly";
+  $("recurring-income-date").value = item?.date || today();
+  $("recurring-income-title").textContent = item ? "Edit recurring income" : "Add recurring income";
+  formError("recurring-income-error", "");
+  openModal("recurring-income-modal");
+}
+$("add-recurring-income-btn")?.addEventListener("click", () => openRecurringIncome());
+$("recurring-income-form")?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const id = $("recurring-income-id").value;
+  if (inputAmount($("recurring-income-amount").value) === null) return formError("recurring-income-error", "Enter a positive amount with at most two decimal places.");
+  const item = cleanRecurringIncome({
+    id: id || uid(), name: $("recurring-income-name").value, amount: $("recurring-income-amount").value,
+    cycle: $("recurring-income-cycle").value, date: $("recurring-income-date").value
+  });
+  if (!item) return formError("recurring-income-error", "Enter a name, amount above zero, frequency and valid date.");
+  recurringIncome = id ? recurringIncome.map((entry) => entry.id === id ? item : entry) : [...recurringIncome, item];
+  save(KEYS.recurringIncome, recurringIncome);
+  render();
+  closeModal("recurring-income-modal");
+});
+$("recurring-income-list")?.addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (!button) return;
+  if (button.matches(".edit-recurring-income")) openRecurringIncome(button.dataset.id);
+  else if (button.matches(".delete-recurring-income") && confirm("Delete this recurring income schedule?")) {
+    recurringIncome = recurringIncome.filter((entry) => entry.id !== button.dataset.id);
+    save(KEYS.recurringIncome, recurringIncome);
+    render();
+  }
+});
 function monthExpenseIncome(anchor) {
-  const items = rangeTransactions(periodRange("month", anchor));
+  const range = periodRange("month", anchor);
+  const items = rangeTransactions({ start: range.start, end: anchor });
   return {
     count: items.length,
     spent: items.filter((t) => t.type === "expense").reduce((sum, t) => sum + t.amount, 0),
@@ -1831,28 +2205,22 @@ function renderForecast() {
     <p class="${diff < 0 ? "forecast-over" : "forecast-ok"}">${monthlyBudget <= 0 ? "Set a monthly budget to compare." : diff < 0
       ? `On this pace you will go ${money(-diff)} over your ${money(monthlyBudget)} budget.`
       : `On this pace you will finish ${money(diff)} under your ${money(monthlyBudget)} budget.`}</p>`;
-  const past = [1, 2, 3].map((i) => monthExpenseIncome(shiftMonth(now, -i))).filter((m) => m.count > 0);
-  const avg = (key) => past.length ? past.reduce((sum, m) => sum + m[key], 0) / past.length : 0;
-  const spend = avg("spent");
-  const income = avg("income");
-  $("forecast-basis").textContent = past.length
-    ? `Cumulative projected income minus spending, starting at zero; based on the average of ${past.length} of the last 3 months with recorded transactions: ${money(income)} income and ${money(spend)} spending. Incomplete records can skew this estimate.`
-    : "";
-  if (!past.length) {
-    $("forecast-list").innerHTML = `<li class="empty-state">Record income and spending in a previous month to see an estimate.</li>`;
-    return;
-  }
+  $("forecast-basis").textContent = "Scheduled income minus bills and subscriptions selected for forecasts, accumulated from zero. Excludes unscheduled transactions, savings, debts and other spending; it is not an account balance. Do not select subscriptions already tracked as bills.";
   let running = 0;
   const rows = [1, 2, 3, 4, 5, 6].map((i) => {
-    const net = income - spend;
+    const future = periodRange("month", shiftMonth(now, i));
+    const income = recurringIncome.reduce((sum, item) => sum + recurrenceDates(item, future).length * item.amount, 0);
+    const billTotal = billOccurrences(future).reduce((sum, item) => sum + item.bill.amount, 0);
+    const subTotal = subscriptions.filter((sub) => sub.forecast).reduce((sum, sub) => sum + recurrenceDates(sub, future).length * sub.amount, 0);
+    const net = income - billTotal - subTotal;
     running += net;
-    return { label: formatDate(shiftMonth(now, i), { month: "short", year: "numeric" }), net, running };
+    return { label: formatDate(future.start, { month: "short", year: "numeric" }), income, expenses: billTotal + subTotal, net, running };
   });
   const max = Math.max(1, ...rows.map((r) => Math.abs(r.running)));
   $("forecast-list").innerHTML = rows.map((r) => `<li>
     <span>${esc(r.label)}</span>
     <span class="forecast-track"><span class="forecast-fill ${r.running < 0 ? "negative" : ""}" style="width:${Math.max(2, Math.round(Math.abs(r.running) / max * 100))}%"></span></span>
-    <strong>${money(r.running)}</strong></li>`).join("");
+    <strong>${money(r.running)}<small class="sr-only">; ${money(r.income)} scheduled income, ${money(r.expenses)} scheduled expenses this month</small></strong></li>`).join("");
 }
 
 /* CSV import */
@@ -2012,3 +2380,4 @@ if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
 renderCategoryOptions();
 applyLayout();
 render();
+if (needsOnboarding && $("welcome-modal")) openModal("welcome-modal");

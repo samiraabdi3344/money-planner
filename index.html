@@ -173,8 +173,7 @@
           </div>
           <ul class="bill-list" id="subscription-list" aria-live="polite"></ul>
         </section>
-
-        <section class="panel" id="debts-panel" data-section="debts">
+                <section class="panel" id="debts-panel" data-section="debts">
           <div class="panel-head">
             <div>
               <p class="eyebrow">Debt and repayments</p>
@@ -195,9 +194,10 @@
               </select>
             </label>
             <label class="modal-label"><span>Extra paid each month</span>
-              <input id="debt-extra" type="number" min="0" step="1" value="0" />
+              <input id="debt-extra" type="number" min="0" step="0.01" value="0" />
             </label>
           </div>
+          <p id="debt-extra-error" class="form-error" aria-live="polite"></p>
           <p id="debt-summary" class="modal-hint" aria-live="polite"></p>
           <div id="debt-list" class="debt-list"></div>
         </section>
@@ -208,7 +208,10 @@
               <p class="eyebrow">Looking ahead</p>
               <h2>Financial forecast</h2>
             </div>
+            <button id="add-recurring-income-btn" class="secondary-btn" type="button">+ Recurring income</button>
           </div>
+          <p>Recurring income schedules are estimates only; they do not create transactions or change your budget.</p>
+          <ul id="recurring-income-list" class="bill-list" aria-live="polite"></ul>
           <div id="forecast-month" class="forecast-month"></div>
           <h3 class="forecast-title">Next 6 months</h3>
           <p id="forecast-basis" class="modal-hint"></p>
@@ -278,7 +281,7 @@
             <article>
               <div class="chart-head">
                 <h3>Spending by category</h3>
-                                <span class="segmented" role="group" aria-label="Chart style">
+                <span class="segmented" role="group" aria-label="Chart style">
                   <button type="button" class="seg-btn active" data-chart-mode="bars">Bars</button>
                   <button type="button" class="seg-btn" data-chart-mode="pie">Pie</button>
                 </span>
@@ -326,8 +329,7 @@
           </div>
           <p class="modal-hint">General education only, not financial advice.</p>
         </section>
-
-        <section class="panel" data-view-only="settings" hidden>
+                <section class="panel" data-view-only="settings" hidden>
           <div class="panel-head"><div><p class="eyebrow">Make it yours</p><h2>Appearance and dashboard</h2></div></div>
           <div class="panel-buttons">
             <button id="customize-btn" class="secondary-btn" type="button">Customise dashboard</button>
@@ -343,6 +345,7 @@
             </div>
           </div>
           <p>Export a backup of your transactions, budget, bills, goals, and settings, or open your transactions in Excel with a CSV file.</p>
+          <p>Money Planner stores your information in this browser using local storage. It does not automatically sync between devices. Clearing browser data can remove it, so download backups regularly and keep them somewhere safe.</p>
           <div class="panel-buttons">
             <button id="export-data-btn" class="secondary-btn" type="button">Download backup</button>
             <button id="export-csv-btn" class="secondary-btn" type="button">Export transactions (CSV)</button>
@@ -355,6 +358,7 @@
               Restore backup
               <input id="import-data-input" type="file" accept="application/json,.json" />
             </label>
+            <button id="clear-data-btn" class="secondary-btn" type="button">Clear all app data</button>
           </div>
           <p id="backup-message" class="form-message" aria-live="polite"></p>
         </section>
@@ -412,6 +416,18 @@
         </section>
       </section>
     </main>
+  </div>
+    <div class="modal hidden" id="welcome-modal" role="dialog" aria-modal="true" aria-labelledby="welcome-title" aria-describedby="welcome-description">
+    <div class="modal-card">
+      <div class="modal-header"><h3 id="welcome-title">Welcome to Money Planner</h3></div>
+      <p id="welcome-description">Choose how to begin. Your information stays in this browser and does not automatically sync to other devices.</p>
+      <p>Sample data lets you explore the dashboard. A blank dashboard starts with no transactions or bills and a zero budget.</p>
+      <p id="welcome-error" class="form-error" aria-live="polite"></p>
+      <div class="panel-buttons">
+        <button id="start-sample-btn" class="secondary-btn" type="button">Explore sample data</button>
+        <button id="start-blank-btn" class="primary-btn" type="button">Start blank</button>
+      </div>
+    </div>
   </div>
 
   <div class="modal hidden" id="budget-modal" role="dialog" aria-modal="true" aria-labelledby="budget-modal-title">
@@ -502,6 +518,16 @@
             <option value="bill">Bill allocation</option>
           </select>
         </label>
+        <label class="modal-label" id="allocation-category-label" hidden>
+          <span>Spending category</span>
+          <input id="allocation-category" type="text" list="category-options" />
+          <small>Expenses in this category reduce the remaining allocation.</small>
+        </label>
+        <label class="modal-label" id="allocation-bill-label" hidden>
+          <span>Bill</span>
+          <select id="allocation-bill"></select>
+          <small>Tracks your monthly plan for this bill. The full unpaid bill is already reserved, so this allocation does not reduce availability again.</small>
+        </label>
         <label class="modal-label">
           <span>Amount per month</span>
           <input id="planned-amount" type="number" min="0.01" step="0.01" required />
@@ -535,7 +561,7 @@
     </div>
   </div>
 
-    <div class="modal hidden" id="category-budget-modal" role="dialog" aria-modal="true" aria-labelledby="category-budget-title">
+  <div class="modal hidden" id="category-budget-modal" role="dialog" aria-modal="true" aria-labelledby="category-budget-title">
     <div class="modal-card">
       <div class="modal-header">
         <h3 id="category-budget-title">Add category budget</h3>
@@ -560,7 +586,6 @@
     </div>
   </div>
 
-
   <div class="modal hidden" id="goal-modal" role="dialog" aria-modal="true" aria-labelledby="goal-modal-title">
     <div class="modal-card">
       <div class="modal-header">
@@ -581,8 +606,7 @@
       </form>
     </div>
   </div>
-
-  <div class="modal hidden" id="subscription-modal" role="dialog" aria-modal="true" aria-labelledby="subscription-modal-title">
+    <div class="modal hidden" id="subscription-modal" role="dialog" aria-modal="true" aria-labelledby="subscription-modal-title">
     <div class="modal-card">
       <div class="modal-header">
         <h3 id="subscription-modal-title">Add subscription</h3>
@@ -602,8 +626,38 @@
           </select>
         </label>
         <label class="modal-label"><span>Next renewal date</span><input id="subscription-date" type="date" required /></label>
+        <label class="check-label"><input id="subscription-forecast" type="checkbox" /> Include this subscription in forecasts</label>
+        <p class="modal-hint">Only select this if the same cost is not also tracked as a bill, to avoid counting it twice.</p>
         <div class="modal-actions">
           <button class="secondary-btn" type="button" data-close="subscription-modal">Cancel</button>
+          <button class="primary-btn" type="submit">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="recurring-income-modal" role="dialog" aria-modal="true" aria-labelledby="recurring-income-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="recurring-income-title">Add recurring income</h3>
+        <button class="close-btn" type="button" data-close="recurring-income-modal" aria-label="Close">×</button>
+      </div>
+      <form id="recurring-income-form" novalidate>
+        <div id="recurring-income-error" class="form-error" aria-live="polite"></div>
+        <input id="recurring-income-id" type="hidden" />
+        <label class="modal-label"><span>Income name</span><input id="recurring-income-name" type="text" required /></label>
+        <label class="modal-label"><span>Amount per payment</span><input id="recurring-income-amount" type="number" min="0.01" step="0.01" required /></label>
+        <label class="modal-label"><span>Frequency</span>
+          <select id="recurring-income-cycle">
+            <option value="weekly">Weekly</option>
+            <option value="fortnightly">Fortnightly</option>
+            <option value="monthly">Monthly</option>
+            <option value="yearly">Yearly</option>
+          </select>
+        </label>
+        <label class="modal-label"><span>First payment date</span><input id="recurring-income-date" type="date" required /></label>
+        <div class="modal-actions">
+          <button class="secondary-btn" type="button" data-close="recurring-income-modal">Cancel</button>
           <button class="primary-btn" type="submit">Save</button>
         </div>
       </form>
