@@ -129,6 +129,7 @@ function cleanBill(item) {
 const onboardingState = localStorage.getItem(KEYS.onboarding);
 const hasExistingData = Object.values(KEYS).some((key) => key !== KEYS.onboarding && localStorage.getItem(key) !== null);
 let needsOnboarding = onboardingState === "pending" || (!onboardingState && !hasExistingData);
+let sampleData = localStorage.getItem(KEYS.seeded) === "sample";
 if (needsOnboarding && $("welcome-modal")) localStorage.setItem(KEYS.onboarding, "pending");
 
 let transactions = (Array.isArray(load(KEYS.transactions, []))
@@ -219,7 +220,7 @@ function billOccurrences(range, source = transactions) {
     }
     dueDates.filter((date) => date >= range.start && date <= range.end).forEach((date) => {
       const payment = source.find((item) => item.type === "expense" && item.billId === bill.id && item.billDue === date);
-      result.push({ bill, date, paid: Boolean(payment) });
+      result.push({ bill, date, paid: Boolean(payment), payment });
     });
   });
   return result.sort((a, b) => a.date.localeCompare(b.date));
@@ -324,10 +325,10 @@ function renderBills() {
   const list = $("upcoming-bills-list");
   if (!list) return;
   const items = billOccurrences(periodRange());
-  const content = items.length ? items.map(({ bill, date, paid }) => `
+  const content = items.length ? items.map(({ bill, date, paid, payment }) => `
     <li class="${paid ? "is-paid" : ""}">
       <span class="bill-name">${esc(bill.name)}<time datetime="${date}">${formatDate(date, { day: "numeric", month: "short" })}${bill.recurring ? " · monthly" : ""}</time>${allocations.some((a) => a.type === "bill" && a.billId === bill.id) ? `<small>Monthly allocation: ${money(allocations.filter((a) => a.type === "bill" && a.billId === bill.id).reduce((sum, a) => sum + Number(a.amount), 0))} / ${money(bill.amount)}</small>` : ""}</span>
-      <strong>${money(bill.amount)}</strong>
+      <strong>${money(paid ? payment.amount : bill.amount)}</strong>
       <span class="bill-actions">
         <button class="mini-btn pay-bill" data-id="${esc(bill.id)}" data-date="${date}" type="button">${paid ? "Undo" : "Mark paid"}</button>
         <button class="mini-btn edit-bill" data-id="${esc(bill.id)}" type="button">Edit</button>
@@ -434,7 +435,7 @@ function renderCategoryBudgets() {
 const MILESTONES = [25, 50, 75, 100];
 function goalDetails(goal) {
   const remaining = Math.max(0, goal.target - goal.saved);
-  const percent = Math.min(100, Math.round(goal.saved / goal.target * 100));
+  const percent = Math.min(100, Math.floor(goal.saved / goal.target * 100));
   let timing = "";
   if (remaining === 0) timing = "Goal reached — well done!";
   else if (goal.deadline && validDate(goal.deadline)) {
@@ -602,6 +603,7 @@ function renderHistory() {
 }
 /* Main render */
 function render() {
+  if ($("sample-data-notice")) $("sample-data-notice").hidden = !sampleData;
   renderSummary();
   renderAllocations();
   renderBills();
@@ -1015,7 +1017,7 @@ function startDashboard(sample) {
     localStorage.setItem(KEYS.bills, JSON.stringify(initialBills));
     localStorage.setItem(KEYS.allocations, JSON.stringify([]));
     localStorage.setItem(KEYS.budget, JSON.stringify(initialBudget));
-    localStorage.setItem(KEYS.seeded, "1");
+    localStorage.setItem(KEYS.seeded, sample ? "sample" : "blank");
     localStorage.setItem(KEYS.onboarding, "complete");
   } catch (error) {
     console.error("Could not start dashboard:", error);
@@ -1026,6 +1028,7 @@ function startDashboard(sample) {
   bills = initialBills;
   allocations = [];
   monthlyBudget = initialBudget;
+  sampleData = sample;
   needsOnboarding = false;
   closeModal("welcome-modal");
   render();
@@ -1048,6 +1051,7 @@ $("export-data-btn")?.addEventListener("click", () => {
   const backup = {
     version: 1, exportedAt: new Date().toISOString(), transactions, bills, allocations,
     monthlyBudget, periodType, categories, categoryBudgets, goals, subscriptions, recurringIncome, debts, debtPlan, challenges, layout, notifyPrefs,
+    sampleData,
     theme: localStorage.getItem(KEYS.theme)
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
@@ -1086,6 +1090,7 @@ $("import-data-input")?.addEventListener("change", async (event) => {
     const restoredDebts = checkedArray("debts", (item) => Boolean(cleanDebt(item))).map(cleanDebt);
     if (data.monthlyBudget !== undefined && validAmount(data.monthlyBudget, true) === null) throw new Error("Invalid monthly budget in backup.");
     if (data.periodType !== undefined && !Object.hasOwn(FACTORS, data.periodType)) throw new Error("Invalid planning period in backup.");
+    if (data.sampleData !== undefined && typeof data.sampleData !== "boolean") throw new Error("Invalid sample-data marker in backup.");
     for (const key of ["challenges", "layout", "notifyPrefs", "debtPlan"]) {
       if (data[key] !== undefined && (!data[key] || typeof data[key] !== "object" || Array.isArray(data[key]))) throw new Error(`Invalid ${key} in backup.`);
     }
@@ -1101,8 +1106,9 @@ $("import-data-input")?.addEventListener("change", async (event) => {
       [KEYS.categories, restoredCategories], [KEYS.categoryBudgets, restoredCategoryBudgets], [KEYS.goals, restoredGoals],
       [KEYS.subscriptions, restoredSubscriptions], [KEYS.recurringIncome, restoredIncome], [KEYS.debts, restoredDebts],
       [KEYS.debtPlan, restoredDebtPlan], [KEYS.budget, restoredBudget], [KEYS.period, restoredPeriod],
+      [KEYS.seeded, data.sampleData === true ? "sample" : "blank"],
       [KEYS.challenges, data.challenges || {}], [KEYS.layout, data.layout || {}], [KEYS.notifyPrefs, data.notifyPrefs || {}]
-    ].map(([key, value]) => [key, JSON.stringify(value)]);
+    ].map(([key, value]) => [key, key === KEYS.seeded ? value : JSON.stringify(value)]);
     if (THEMES.includes(data.theme)) writes.push([KEYS.theme, data.theme]);
     const previous = writes.map(([key]) => [key, localStorage.getItem(key)]);
     try {
@@ -1127,6 +1133,7 @@ $("import-data-input")?.addEventListener("change", async (event) => {
     debts = restoredDebts;
     debtPlan = restoredDebtPlan;
     monthlyBudget = restoredBudget;
+    sampleData = data.sampleData === true;
     periodType = restoredPeriod;
     challenges = data.challenges || {};
     layout = data.layout || {};
@@ -2160,7 +2167,10 @@ $("import-csv-input")?.addEventListener("change", async (event) => {
     const rows = parseCsv(await file.text());
     if (rows.length < 2) throw new Error("The CSV must contain a header and at least one transaction.");
     const result = importCsvRows(rows);
-    if (!confirm(`Import ${result.added.length} transaction${result.added.length === 1 ? "" : "s"}?${result.duplicates ? `\n${result.duplicates} may be duplicates and will also be imported.` : ""}`)) return;
+    if (!confirm(`Import ${result.added.length} transaction${result.added.length === 1 ? "" : "s"}?${result.duplicates ? `\n${result.duplicates} may be duplicates and will also be imported.` : ""}`)) {
+      showMessage("backup-message", "Import cancelled. No transactions were imported.");
+      return;
+    }
     result.added.forEach((t) => rememberCategory(t.category));
     transactions = [...transactions, ...result.added];
     saveTransactions();
@@ -2203,7 +2213,7 @@ function buildReport(month) {
     <h3>Spending by category</h3>
     ${cats.length ? table(["Category", "Spent", "Share"], cats.map(([c, v]) => `<tr><td>${esc(c)}</td><td class="num">${money(v)}</td><td class="num">${Math.round(v / spent * 100)}%</td></tr>`)) : "<p>No spending recorded.</p>"}
     <h3>Bills</h3>
-    ${billRows.length ? table(["Bill", "Amount", "Status"], billRows.map((b) => `<tr><td>${esc(b.bill.name)} (${esc(formatDate(b.date, { day: "numeric", month: "short" }))})</td><td class="num">${money(b.bill.amount)}</td><td class="num">${b.paid ? "Paid" : "Unpaid"}</td></tr>`)) : "<p>No bills this month.</p>"}
+    ${billRows.length ? table(["Bill", "Amount", "Status"], billRows.map((b) => `<tr><td>${esc(b.bill.name)} (${esc(formatDate(b.date, { day: "numeric", month: "short" }))})</td><td class="num">${money(b.paid ? b.payment.amount : b.bill.amount)}</td><td class="num">${b.paid ? "Paid" : "Unpaid"}</td></tr>`)) : "<p>No bills this month.</p>"}
     <h3>Savings goals (current)</h3>
     ${goals.length ? table(["Goal", "Saved", "Target"], goals.map((g) => `<tr><td>${esc(g.name)}</td><td class="num">${money(g.saved)}</td><td class="num">${money(g.target)}</td></tr>`)) : "<p>No savings goals.</p>"}
     <h3>Debts (current)</h3>
